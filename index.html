@@ -1,0 +1,1226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wisconsin Probate Forms</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Wisconsin Probate Forms</p>
+        <h1>Create your Wisconsin probate forms</h1>
+      </div>
+      <div class="top-actions">
+        <div class="mode-switch" role="group" aria-label="View mode">
+          <button type="button" id="funnelModeBtn" class="mode-button">Public site</button>
+          <button type="button" id="guidedModeBtn" class="mode-button active">Guided interview</button>
+          <button type="button" id="formsModeBtn" class="mode-button">View forms</button>
+          <button type="button" id="roadmapModeBtn" class="mode-button">Roadmap</button>
+          <button type="button" id="adminModeBtn" class="mode-button">Admin beta</button>
+          <button type="button" id="scenariosModeBtn" class="mode-button">Test scenarios</button>
+          <button type="button" id="editModeBtn" class="mode-button">Review/Edit answers</button>
+        </div>
+        <button type="button" id="saveCaseBtn" class="secondary">Save case</button>
+        <button type="button" id="loadCaseBtn" class="secondary">Load case</button>
+        <input type="file" id="caseFileInput" accept="application/json,.json" hidden />
+        <button type="button" id="loadSampleBtn" class="secondary">Load sample</button>
+        <button type="button" id="clearBtn" class="ghost">Clear</button>
+      </div>
+    </header>
+
+    <section id="funnelView" class="funnel-view" hidden>
+      <div class="funnel-hero">
+        <div>
+          <p class="eyebrow">Wisconsin probate document automation</p>
+          <h2>Create your Wisconsin probate forms, step by step.</h2>
+          <p>Answer simple questions about the estate. We will help prepare Wisconsin probate documents and filing checklists for eligible Transfer by Affidavit and informal probate matters.</p>
+          <div class="funnel-actions">
+            <button type="button" class="primary" data-funnel-start>Start my probate forms</button>
+            <button type="button" class="secondary" data-funnel-forms>See what's included</button>
+          </div>
+        </div>
+        <div class="funnel-status-card">
+          <span>Start free</span>
+          <strong>Pay before final download</strong>
+          <p>Use the free Wisconsin Probate Form Starter to preview the result, missing information, and package before downloading final documents.</p>
+        </div>
+      </div>
+
+      <div class="funnel-grid">
+        <section class="funnel-card active">
+          <span>Paid package</span>
+          <h3>Transfer by Affidavit Package</h3>
+          <strong>$149 target</strong>
+          <p>Create a Wisconsin Transfer by Affidavit package for eligible smaller estates, with a guided interview, completed document packet, and transfer checklist.</p>
+        </section>
+        <section class="funnel-card">
+          <span>Paid package</span>
+          <h3>Informal Probate Forms Package</h3>
+          <strong>$499 target</strong>
+          <p>Create Wisconsin informal probate opening forms for eligible uncontested estates, including interested-person tracking, waiver or notice workflow, PR forms, and filing checklist.</p>
+        </section>
+        <section class="funnel-card">
+          <span>Free result</span>
+          <h3>Information Summary</h3>
+          <strong>Attorney review may be recommended</strong>
+          <p>When answers show red flags, the software can organize an information summary that the user may download and choose whether to share with a Wisconsin probate attorney.</p>
+        </section>
+      </div>
+
+      <div class="funnel-band">
+        <div>
+          <p class="eyebrow">Free before payment</p>
+          <h3>What users can do before buying</h3>
+        </div>
+        <ul>
+          <li>Use the Free Wisconsin Probate Form Starter.</li>
+          <li>Enter the estate, family, party, and asset facts.</li>
+          <li>Preview whether the package is ready or needs attorney review.</li>
+          <li>See what forms, notices, publication, and next steps apply.</li>
+        </ul>
+      </div>
+
+      <div class="funnel-disclaimer">
+        <p>Not a law firm. Not legal advice. Probate requirements may vary by county and case facts.</p>
+      </div>
+    </section>
+
+    <section id="interviewView" class="interview-view">
+      <aside class="interview-rail">
+        <p class="eyebrow">Guided interview</p>
+        <h2 id="interviewGroupTitle">Start</h2>
+        <div class="interview-meter" aria-label="Interview progress">
+          <div id="interviewMeterFill"></div>
+        </div>
+        <ol id="interviewProgress" class="interview-progress"></ol>
+      </aside>
+
+      <main class="interview-card" aria-live="polite">
+        <div class="interview-step-meta" id="interviewStepMeta">Step 1</div>
+        <h2 id="interviewQuestion">Let us get started.</h2>
+        <div id="interviewHelp" class="interview-help"></div>
+        <div id="interviewFields" class="interview-fields"></div>
+        <div id="interviewMessage" class="interview-message"></div>
+        <div class="interview-actions">
+          <button type="button" id="interviewBackBtn" class="ghost">Back</button>
+          <button type="button" id="interviewEditBtn" class="secondary">Review/Edit answers</button>
+          <button type="button" id="interviewNextBtn" class="primary">Next</button>
+        </div>
+      </main>
+
+      <aside class="interview-summary">
+        <div class="review-card">
+          <p class="eyebrow">Current answers</p>
+          <div id="interviewAnswerSummary" class="summary"></div>
+          <div id="interviewPathSummary" class="path-card mini"></div>
+        </div>
+      </aside>
+    </section>
+
+    <section id="formsView" class="forms-view" hidden>
+      <div class="forms-header">
+        <div>
+          <p class="eyebrow">Forms preview</p>
+          <h2>Forms being prepared</h2>
+        </div>
+        <button type="button" id="formsBackBtn" class="secondary">Back to interview</button>
+      </div>
+      <div id="formsDownloadArea" class="download-area"></div>
+      <div id="formsPreviewList" class="forms-preview-list"></div>
+    </section>
+
+    <section id="roadmapView" class="roadmap-view" hidden>
+      <div class="roadmap-header">
+        <div>
+          <p class="eyebrow">Product plan</p>
+          <h2>Build roadmap</h2>
+        </div>
+        <div class="inline-actions">
+          <button type="button" id="roadmapScenariosBtn" class="secondary">Open test scenarios</button>
+          <button type="button" id="roadmapBackBtn" class="secondary">Back to interview</button>
+        </div>
+      </div>
+
+      <div class="roadmap-hero">
+        <div>
+          <p class="eyebrow">Recommended direction</p>
+          <h3>Responsive web app first, installable phone app later.</h3>
+          <p>Build the public and attorney experience as a secure website that works well on phones. After the opening packet is reliable, add saved accounts, secure document links, reminders, inventory, accounting, and closing.</p>
+        </div>
+        <div class="roadmap-status">
+          <strong>Current focus</strong>
+          <span>Opening packet MVP</span>
+        </div>
+      </div>
+
+      <div id="roadmapBetaReadiness"></div>
+      <div id="roadmapLogicAudit"></div>
+      <div id="roadmapLegalReview"></div>
+
+      <div class="roadmap-grid">
+        <article class="roadmap-card active">
+          <span>Phase 1</span>
+          <h3>Opening Packet MVP</h3>
+          <p>Finish the small-estate router and informal probate opening workflow, then make packet decisions dependable.</p>
+          <ul>
+            <li>Transfer by Affidavit MVP package and official PR-1831 template mapping.</li>
+            <li>PR-1801, PR-1803, PR-1804, PR-1805, PR-1806, PR-1807, PR-1808, PR-1810, PR-1817.</li>
+            <li>Waiver vs. PR-1805 logic.</li>
+            <li>Packet readiness review and filing handoff.</li>
+          </ul>
+        </article>
+        <article class="roadmap-card">
+          <span>Phase 2</span>
+          <h3>Production Platform</h3>
+          <p>Move from a local prototype to a secure hosted app.</p>
+          <ul>
+            <li>User accounts and saved cases.</li>
+            <li>Attorney, staff, PR, and public roles.</li>
+            <li>Secure storage, audit history, and form versioning.</li>
+          </ul>
+        </article>
+        <article class="roadmap-card">
+          <span>Phase 3</span>
+          <h3>Mobile and Sharing</h3>
+          <p>Make the app practical for personal representatives and families on phones.</p>
+          <ul>
+            <li>Mobile-first interview screens.</li>
+            <li>Secure email links instead of ordinary attachments.</li>
+            <li>Recipient access and reminder tracking.</li>
+          </ul>
+        </article>
+        <article class="roadmap-card">
+          <span>Phase 4</span>
+          <h3>Inventory and Accounting</h3>
+          <p>Guide the PR through administration after letters issue.</p>
+          <ul>
+            <li>PR-1811 asset wizard.</li>
+            <li>Claims and deadline tracking.</li>
+            <li>Estate account reconciliation.</li>
+          </ul>
+        </article>
+        <article class="roadmap-card">
+          <span>Phase 5</span>
+          <h3>Closing Workflow</h3>
+          <p>Help the PR finish cleanly with receipts, releases, and final review.</p>
+          <ul>
+            <li>Distribution and release tracking.</li>
+            <li>Closing checklist and final archive.</li>
+            <li>Attorney review prompts for sensitive issues.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="roadmap-next">
+        <div>
+          <p class="eyebrow">Next build sequence</p>
+          <h3>What we should build next</h3>
+        </div>
+        <ol>
+          <li>Add and map the official Wisconsin PR-1831 Transfer by Affidavit template.</li>
+          <li>Review Transfer by Affidavit rules and attorney handoff/referral model with Wisconsin counsel.</li>
+          <li>Expand formal test scenarios for affidavit, blended-family, deceased-child, trust, charity, and missing-party cases.</li>
+          <li>Design the production data model for users, cases, parties, forms, tasks, documents, and audit events.</li>
+          <li>Prototype secure document delivery permissions before connecting real email.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="adminView" class="admin-view" hidden>
+      <div class="admin-header">
+        <div>
+          <p class="eyebrow">Production foundation</p>
+          <h2>Admin and reviewer beta</h2>
+        </div>
+        <div class="inline-actions">
+          <button type="button" id="adminSaveMatterBtn" class="secondary">Save matter checkpoint</button>
+          <button type="button" id="adminBackBtn" class="secondary">Back to interview</button>
+        </div>
+      </div>
+      <div id="adminSummary"></div>
+      <div id="adminMatterList"></div>
+      <div id="adminLogList"></div>
+      <div id="adminDataModel"></div>
+    </section>
+
+    <section id="scenarioView" class="scenario-view" hidden>
+      <div class="scenario-header">
+        <div>
+          <p class="eyebrow">Quality checks</p>
+          <h2>Formal test scenarios</h2>
+        </div>
+        <div class="inline-actions">
+          <button type="button" id="runAllScenariosBtn" class="secondary">Run all scenarios</button>
+          <button type="button" id="scenariosBackBtn" class="secondary">Back to interview</button>
+        </div>
+      </div>
+      <div id="scenarioSummary" class="scenario-summary"></div>
+      <div id="scenarioLogicAudit" class="scenario-logic-audit"></div>
+      <div id="scenarioList" class="scenario-list"></div>
+    </section>
+
+    <div id="editView" class="layout" hidden>
+      <nav class="steps" aria-label="Intake sections">
+        <button type="button" class="step active" data-step="triage">Triage</button>
+        <button type="button" class="step" data-step="decedent">Decedent</button>
+        <button type="button" class="step" data-step="applicant">Applicant and PR</button>
+        <button type="button" class="step" data-step="will">Will path</button>
+        <button type="button" class="step" data-step="beneficiaries" data-show-when="willYes">Will beneficiaries</button>
+        <button type="button" class="step" data-step="heirship">Heirship</button>
+        <button type="button" class="step" data-step="benefits">Benefits</button>
+        <button type="button" class="step" data-step="spouse" data-show-when="spouseYes">Spouse</button>
+        <button type="button" class="step" data-step="interested">Interested persons</button>
+        <button type="button" class="step" data-step="opening">Opening path</button>
+        <button type="button" class="step" data-step="checklist">Checklist</button>
+        <button type="button" class="step" data-step="service">Service</button>
+        <button type="button" class="step" data-step="court">Court drafts</button>
+        <button type="button" class="step" data-step="inventory">Inventory</button>
+        <button type="button" class="step" data-step="tasks">Tasks</button>
+        <button type="button" class="step" data-step="requests">Requests</button>
+      </nav>
+
+      <main class="workspace">
+        <form id="intakeForm">
+          <section class="panel active" data-panel="triage">
+            <div class="panel-heading">
+              <p class="eyebrow">Start</p>
+              <h2>Eligibility snapshot</h2>
+            </div>
+            <div class="grid two">
+              <label>Wisconsin county
+                <select data-path="estate.county" id="estateCountySelect">
+                  <option value="">Select county</option>
+                </select>
+              </label>
+              <label>Case number
+                <input data-path="estate.caseNumber" placeholder="Blank until assigned" />
+              </label>
+              <label>Estimated probate property value
+                <input data-path="estate.estimatedGrossValue" inputmode="decimal" placeholder="75000" />
+              </label>
+              <label>Other estate proceedings
+                <select data-path="otherProceedings.status">
+                  <option value="">Select</option>
+                  <option value="not_pending">Are not pending</option>
+                  <option value="pending">Are pending</option>
+                </select>
+              </label>
+              <label>Explanation, if any
+                <input data-path="otherProceedings.explanation" />
+              </label>
+            </div>
+            <label class="checkline">
+              <input type="checkbox" data-path="estate.isAmended" />
+              Mark PR-1801 as amended
+            </label>
+            <div class="preparer-box">
+              <div class="row-heading">
+                <div>
+                  <h3>County/Court defaults</h3>
+                  <p>These values can auto-fill PR-1804 and PR-1805 so the courthouse, registrar, and newspaper are not entered twice.</p>
+                  <p id="countyDefaultsSourceNote" class="source-note"></p>
+                </div>
+                <div class="inline-actions">
+                  <button type="button" id="loadCountyLibraryBtn" class="secondary">Use library defaults</button>
+                  <button type="button" id="applyCountyDefaultsBtn" class="secondary">Apply defaults</button>
+                </div>
+              </div>
+              <div class="grid two">
+                <label>Courthouse county/name
+                  <input data-path="countyDefaults.courthouseCounty" placeholder="Milwaukee" />
+                </label>
+                <label>Courthouse address
+                  <input data-path="countyDefaults.courthouseAddress" placeholder="Street, city, state, zip" />
+                </label>
+                <label>Room or branch
+                  <input data-path="countyDefaults.room" />
+                </label>
+                <label>Probate office
+                  <input data-path="countyDefaults.probateOfficeName" placeholder="Probate Division" />
+                </label>
+                <label>Probate registrar
+                  <input data-path="countyDefaults.registrarName" />
+                </label>
+                <label>Publication newspaper
+                  <input data-path="countyDefaults.newspaperName" />
+                </label>
+                <label>Accommodation phone
+                  <input data-path="countyDefaults.accommodationPhone" />
+                </label>
+                <label>Local notes
+                  <textarea rows="3" data-path="countyDefaults.localNotes"></textarea>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="decedent">
+            <div class="panel-heading">
+              <p class="eyebrow">Estate profile</p>
+              <h2>Decedent</h2>
+            </div>
+            <div class="grid two">
+              <label>Full legal name
+                <input data-path="decedent.fullName" placeholder="Jane A. Decedent" />
+              </label>
+              <label>Date of birth
+                <input type="date" data-path="decedent.dateOfBirth" />
+              </label>
+              <label>Date of death
+                <input type="date" data-path="decedent.dateOfDeath" />
+              </label>
+              <label>Domicile county
+                <input data-path="decedent.domicileCounty" placeholder="Milwaukee" />
+              </label>
+              <label>Domicile state
+                <input data-path="decedent.domicileState" placeholder="Wisconsin" />
+              </label>
+              <label>Last mailing address
+                <input data-path="decedent.lastMailingAddress" placeholder="Street, city, state, zip" />
+              </label>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="applicant">
+            <div class="panel-heading">
+              <p class="eyebrow">People</p>
+              <h2>Applicant and proposed personal representative</h2>
+            </div>
+            <div class="split">
+              <div>
+                <h3>Applicant</h3>
+                <div class="grid two compact">
+                  <label>Name
+                    <input data-path="applicant.fullName" />
+                  </label>
+                  <label>Interested as
+                    <input data-path="applicant.capacity" placeholder="Heir and nominated PR" />
+                  </label>
+                  <label>Address
+                    <input data-path="applicant.address" />
+                  </label>
+                  <label>Email
+                    <input type="email" data-path="applicant.email" />
+                  </label>
+                  <label>Phone
+                    <input data-path="applicant.phone" />
+                  </label>
+                  <label>Signature date
+                    <input type="date" data-path="applicant.signatureDate" />
+                  </label>
+                  <label>State Bar number
+                    <input data-path="applicant.barNumber" />
+                  </label>
+                </div>
+              </div>
+              <div>
+                <h3>Proposed PR</h3>
+                <label class="checkline same-person-toggle">
+                  <input type="checkbox" data-path="pr.sameAsApplicant" />
+                  Applicant will also serve as personal representative
+                </label>
+                <div class="path-card mini" data-show-when="prSame">
+                  <h3>Using applicant contact details</h3>
+                  <p>The proposed PR name, address, email, phone, signature date, and bar number will follow the applicant answers.</p>
+                </div>
+                <div class="grid two compact" data-show-when="prDifferent">
+                  <label>Name
+                    <input data-path="pr.fullName" />
+                  </label>
+                  <label>Address
+                    <input data-path="pr.address" />
+                  </label>
+                  <label>Email
+                    <input type="email" data-path="pr.email" />
+                  </label>
+                  <label>Phone
+                    <input data-path="pr.phone" />
+                  </label>
+                  <label>Signature date
+                    <input type="date" data-path="pr.signatureDate" />
+                  </label>
+                  <label>State Bar number
+                    <input data-path="pr.barNumber" />
+                  </label>
+                </div>
+                <label class="residency-question">Wisconsin resident
+                  <select data-path="pr.isWisconsinResident">
+                    <option value="">Select</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="preparer-box" data-show-when="residentAgent">
+              <h3>Resident agent for nonresident PR</h3>
+              <div class="grid two compact">
+                <label>Resident agent name
+                  <input data-path="pr.residentAgent.name" />
+                </label>
+                <label>Address
+                  <input data-path="pr.residentAgent.address" />
+                </label>
+                <label>Email
+                  <input type="email" data-path="pr.residentAgent.email" />
+                </label>
+                <label>Phone
+                  <input data-path="pr.residentAgent.phone" />
+                </label>
+                <label>Signature date
+                  <input type="date" data-path="pr.residentAgent.signatureDate" />
+                </label>
+                <label>State Bar number
+                  <input data-path="pr.residentAgent.barNumber" />
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="will">
+            <div class="panel-heading">
+              <p class="eyebrow">Question 7 or 8</p>
+              <h2>Will path</h2>
+            </div>
+            <div class="grid two">
+              <label>Did the decedent leave a will?
+                <select data-path="will.exists">
+                  <option value="">Select</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+              </label>
+              <label data-show-when="willYes">Will date
+                <input type="date" data-path="will.date" />
+              </label>
+              <label data-show-when="willYes">Any codicils?
+                <select data-path="will.hasCodicils">
+                  <option value="">Select</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </label>
+              <label data-show-when="hasCodicils">Codicil dates
+                <input data-path="will.codicilDates" placeholder="Separate multiple dates with commas" />
+              </label>
+              <label data-show-when="willYes">Original will status
+                <select data-path="will.location">
+                  <option value="">Select</option>
+                  <option value="court">In possession of the court</option>
+                  <option value="accompanies">Accompanies this application</option>
+                  <option value="probated_elsewhere">Probated elsewhere</option>
+                  <option value="en_route">En route to court</option>
+                </select>
+              </label>
+              <label data-show-when="willPriorCase">Prior court case number
+                <input data-path="will.priorCaseNumber" />
+              </label>
+              <label data-show-when="willYes">PR named in will
+                <input data-path="will.namedPr" />
+              </label>
+              <label data-show-when="willYes">Trustee named in will
+                <input data-path="will.namedTrustee" />
+              </label>
+              <label data-show-when="willYes">Nominated trustee
+                <input data-path="will.nominatedTrustee" />
+              </label>
+            </div>
+            <label class="checkline" data-show-when="willNo">
+              <input type="checkbox" data-path="will.noWillDiligentInquiry" />
+              Diligent inquiry found no unrevoked will
+            </label>
+          </section>
+
+          <section class="panel" data-panel="benefits">
+            <div class="panel-heading">
+              <p class="eyebrow">PR-1801 question 5</p>
+              <h2>Decedent public benefits</h2>
+            </div>
+            <div class="grid two">
+              <label>Medical Assistance or Medicaid
+                <select data-path="benefits.medicalAssistance">
+                  <option value="">Select</option>
+                  <option value="did">Did receive</option>
+                  <option value="did_not">Did not receive</option>
+                </select>
+              </label>
+              <label>Family Care or Partnership
+                <select data-path="benefits.familyCare">
+                  <option value="">Select</option>
+                  <option value="did">Did receive</option>
+                  <option value="did_not">Did not receive</option>
+                </select>
+              </label>
+              <label>Community Options Program
+                <select data-path="benefits.communityOptions">
+                  <option value="">Select</option>
+                  <option value="did">Did receive</option>
+                  <option value="did_not">Did not receive</option>
+                </select>
+              </label>
+              <label>Wisconsin Chronic Disease Program
+                <select data-path="benefits.chronicDisease">
+                  <option value="">Select</option>
+                  <option value="did">Did receive</option>
+                  <option value="did_not">Did not receive</option>
+                </select>
+              </label>
+              <label>State or county institution
+                <select data-path="benefits.institution">
+                  <option value="">Select</option>
+                  <option value="was">Was a patient or inmate</option>
+                  <option value="was_not">Was not a patient or inmate</option>
+                </select>
+              </label>
+              <label data-show-when="benefitExplanation">Explanation
+                <input data-path="benefits.explanation" />
+              </label>
+            </div>
+            <label class="checkline">
+              <input type="checkbox" data-path="benefits.lackInfo" />
+              I lack information to complete this section
+            </label>
+          </section>
+
+          <section class="panel" data-panel="beneficiaries" data-show-when="willYes">
+            <div class="panel-heading row-heading">
+              <div>
+                <p class="eyebrow">Will and trust beneficiaries</p>
+                <h2>People named in the will or codicil</h2>
+              </div>
+              <button type="button" id="addWillBeneficiaryBtn" class="secondary" data-show-when="willBeneficiariesYes">Add beneficiary</button>
+            </div>
+            <div class="path-card">
+              <h3>Beneficiaries can be interested persons</h3>
+              <p>For opening, add each person or entity named to receive property under the will or codicil, and any trust beneficiary you know from the will. Do not enter asset values or bequest details here.</p>
+            </div>
+            <label>Does the will name beneficiaries or trust beneficiaries?
+              <select data-path="will.hasNamedBeneficiaries">
+                <option value="">Select</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+                <option value="unknown">Not sure</option>
+              </select>
+            </label>
+            <div id="willBeneficiaryList" class="person-list" data-show-when="willBeneficiariesYes"></div>
+          </section>
+
+          <section class="panel" data-panel="heirship">
+            <div class="panel-heading">
+              <p class="eyebrow">PR-1806 Proof of Heirship</p>
+              <h2>Family and heirship facts</h2>
+            </div>
+            <div class="split">
+              <div>
+                <h3>Person answering</h3>
+                <div class="grid two compact">
+                  <label>Name
+                    <input data-path="heirship.informant.name" />
+                  </label>
+                  <label>Relationship to decedent
+                    <input data-path="heirship.informant.relationship" />
+                  </label>
+                  <label>Mailing address
+                    <input data-path="heirship.informant.address" />
+                  </label>
+                </div>
+              </div>
+              <div>
+                <h3>Spouse or domestic partner</h3>
+                <div class="grid two compact">
+                  <label>Survived by spouse/domestic partner
+                    <select data-path="heirship.spouse.exists">
+                      <option value="">Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </label>
+                  <label data-show-when="spouseYes">Name
+                    <input data-path="heirship.spouse.name" />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="preparer-box">
+              <h3>Children and descendants</h3>
+              <div class="grid two">
+                <label>Did the decedent have any children, living or deceased?
+                  <select data-path="heirship.children.exists">
+                    <option value="">Select</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </label>
+                <label data-show-when="spouseAndChildrenYes">All children also children of surviving spouse/domestic partner?
+                  <select data-path="heirship.children.allOfSurvivingSpouse">
+                    <option value="">Select</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                    <option value="not_applicable">Not applicable</option>
+                  </select>
+                </label>
+                <label data-show-when="blendedChildren">Details if not all children are of surviving spouse
+                  <input data-path="heirship.children.blendedDetails" />
+                </label>
+                <label data-show-when="childrenYes">Descendants of deceased children
+                  <input data-path="heirship.children.deceasedChildDescendants" placeholder="Deceased child - descendants - dates if needed" />
+                </label>
+              </div>
+              <div id="heirshipChildList" class="person-list" data-show-when="childrenYes"></div>
+            </div>
+
+            <div class="preparer-box" data-show-when="fallbackParents">
+              <h3>Fallback relatives</h3>
+              <div class="grid two">
+                <label>Surviving parents?
+                  <select data-path="heirship.parents.exists">
+                    <option value="">Select</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </label>
+                <label data-show-when="parentsYes">Parent names
+                  <input data-path="heirship.parents.names" />
+                </label>
+                <label data-show-when="fallbackSiblings">Brothers or sisters?
+                  <select data-path="heirship.siblings.exists">
+                    <option value="">Select</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </label>
+                <label data-show-when="siblingsYes">Sibling names
+                  <input data-path="heirship.siblings.names" />
+                </label>
+                <label data-show-when="siblingsYes">Descendants of deceased siblings
+                  <input data-path="heirship.siblings.deceasedSiblingDescendants" />
+                </label>
+                <label data-show-when="fallbackGrandparents">Grandparents / descendants
+                  <input data-path="heirship.grandparents.summary" />
+                </label>
+              </div>
+            </div>
+
+            <div class="preparer-box">
+              <h3>120-hour survivorship</h3>
+              <div class="grid two">
+                <label>Did any listed person die within 120 hours after decedent?
+                  <select data-path="heirship.survivorship120.exists">
+                    <option value="">Select</option>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </label>
+                <label data-show-when="survivorshipYes">Names, dates, descendants
+                  <input data-path="heirship.survivorship120.details" />
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="spouse" data-show-when="spouseYes">
+            <div class="panel-heading">
+              <p class="eyebrow">PR-1801 question 6</p>
+              <h2>Spouse or former spouse</h2>
+            </div>
+            <div class="grid two">
+              <label>Spouse name
+                <input data-path="spouse.fullName" />
+              </label>
+              <label>Living status
+                <select data-path="spouse.livingStatus">
+                  <option value="">Select</option>
+                  <option value="living">Living</option>
+                  <option value="deceased">Deceased</option>
+                </select>
+              </label>
+              <label>Status at death
+                <select data-path="spouse.statusAtDeath">
+                  <option value="">Select</option>
+                  <option value="married">Married to decedent</option>
+                  <option value="divorced">Divorced from decedent</option>
+                </select>
+              </label>
+              <label>Spouse COP benefits
+                <select data-path="spouse.communityOptions">
+                  <option value="">Select</option>
+                  <option value="did">Did receive</option>
+                  <option value="did_not">Did not receive</option>
+                </select>
+              </label>
+              <label>Spouse Chronic Disease benefits
+                <select data-path="spouse.chronicDisease">
+                  <option value="">Select</option>
+                  <option value="did">Did receive</option>
+                  <option value="did_not">Did not receive</option>
+                </select>
+              </label>
+            </div>
+            <div class="inline-checks">
+              <label class="checkline">
+                <input type="checkbox" data-path="spouse.seeAttached" />
+                See attached
+              </label>
+              <label class="checkline">
+                <input type="checkbox" data-path="spouse.lackInfo" />
+                I lack information
+              </label>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="interested">
+            <div class="panel-heading row-heading">
+              <div>
+                <p class="eyebrow">PR-1801 question 9</p>
+                <h2>Interested persons</h2>
+              </div>
+              <button type="button" id="addPersonBtn" class="secondary">Add person</button>
+            </div>
+            <div class="path-card">
+              <h3>Suggested from your answers</h3>
+              <p>Review these suggestions from the applicant, proposed PR, will, and heirship answers. Add anyone who should receive notice or sign a waiver, then edit addresses or relationships below.</p>
+            </div>
+            <div class="row-heading suggestion-heading">
+              <h3>Suggested interested persons</h3>
+              <button type="button" id="addAllSuggestedInterestedBtn" class="secondary">Add all suggestions</button>
+            </div>
+            <div id="interestedSuggestions" class="suggestion-list"></div>
+            <div id="interestedList" class="person-list"></div>
+          </section>
+
+          <section class="panel" data-panel="opening">
+            <div class="panel-heading">
+              <p class="eyebrow">Waiver or notice</p>
+              <h2>Opening path</h2>
+            </div>
+            <div id="openingPathCard" class="path-card"></div>
+            <div class="grid two">
+              <label>Can every interested person sign PR-1803 Waiver and Consent?
+                <select data-path="opening.waiverStatus">
+                  <option value="">Select</option>
+                  <option value="all_signed">Yes, all signed or will sign</option>
+                  <option value="not_all">No, at least one will not or cannot sign</option>
+                  <option value="unknown">Not sure yet</option>
+                </select>
+              </label>
+              <label>Known or reasonably ascertainable interested persons missing?
+                <select data-path="opening.unknownInterestedPersonsStatus">
+                  <option value="">Select</option>
+                  <option value="none">No</option>
+                  <option value="some_unknown">Yes</option>
+                </select>
+              </label>
+              <label>Unknown names/addresses, if any
+                <input data-path="notice1805.unknownInterestedPersons" />
+              </label>
+              <label>Publication newspaper
+                <input data-path="notice1805.newspaperName" />
+              </label>
+              <label>Why notice may be needed
+                <select data-path="opening.noticeReason">
+                  <option value="">Select</option>
+                  <option value="refuses">Someone will not sign</option>
+                  <option value="minor">Minor or protected person</option>
+                  <option value="not_found">Someone cannot be found</option>
+                  <option value="unknown_person">Unknown interested person</option>
+                  <option value="other">Other reason</option>
+                </select>
+              </label>
+              <label>Who cannot sign or should receive notice
+                <input data-path="opening.peopleWhoCannotSign" />
+              </label>
+              <label>Who cannot be found
+                <input data-path="opening.peopleNotFound" />
+              </label>
+              <label>Publication or service notes
+                <textarea rows="3" data-path="opening.publicationNotes"></textarea>
+              </label>
+            </div>
+
+            <div class="preparer-box">
+              <h3>PR-1803 waiver settings</h3>
+              <div class="grid two">
+                <label>Waiver signature packet
+                  <select data-path="waiver.signatureMode">
+                    <option value="single">One shared waiver for all signers</option>
+                    <option value="individual">Separate waiver for each signer</option>
+                  </select>
+                </label>
+                <label>Waiver signer date
+                  <input type="date" data-path="waiver.signatureDate" />
+                </label>
+              </div>
+              <div class="inline-checks">
+                <label class="checkline">
+                  <input type="checkbox" data-path="waiver.receivedWillCopy" />
+                  Signers received will copy
+                </label>
+                <label class="checkline">
+                  <input type="checkbox" data-path="waiver.receivedBequestNotice" />
+                  Signers received bequest notice
+                </label>
+                <label class="checkline">
+                  <input type="checkbox" data-path="waiver.consentToAdmitWill" />
+                  Consent to admit will
+                </label>
+                <label class="checkline">
+                  <input type="checkbox" data-path="waiver.otherSelected" />
+                  Include other waiver text
+                </label>
+              </div>
+              <div class="grid two">
+                <label>Other waiver text
+                  <input data-path="waiver.otherText" />
+                </label>
+              </div>
+            </div>
+
+            <div class="preparer-box">
+              <h3>PR-1804 notice to creditors</h3>
+              <div class="grid two">
+                <label>Claim deadline
+                  <input type="date" data-path="notice1804.claimDeadline" />
+                </label>
+                <label>Publication newspaper
+                  <input data-path="notice1804.newspaperName" />
+                </label>
+                <label>Courthouse county/name
+                  <input data-path="notice1804.courthouseCounty" placeholder="Milwaukee" />
+                </label>
+                <label>Courthouse address
+                  <input data-path="notice1804.courthouseAddress" placeholder="901 North 9th Street" />
+                </label>
+                <label>Room
+                  <input data-path="notice1804.room" />
+                </label>
+              </div>
+            </div>
+
+            <div class="preparer-box">
+              <h3>PR-1805 hearing and claim information</h3>
+              <div class="grid two">
+                <label>Courthouse county/name
+                  <input data-path="notice1805.courthouseCounty" placeholder="Milwaukee" />
+                </label>
+                <label>Courthouse address
+                  <input data-path="notice1805.courthouseAddress" placeholder="901 North 9th Street" />
+                </label>
+                <label>Room
+                  <input data-path="notice1805.room" />
+                </label>
+                <label>Probate Registrar
+                  <input data-path="notice1805.registrarName" />
+                </label>
+                <label>Hearing date
+                  <input type="date" data-path="notice1805.hearingDate" />
+                </label>
+                <label>Hearing time
+                  <input data-path="notice1805.hearingTime" placeholder="9:00 a.m." />
+                </label>
+                <label>Claim deadline
+                  <input type="date" data-path="notice1805.claimDeadline" />
+                </label>
+                <label>Accommodation phone
+                  <input data-path="notice1805.accommodationPhone" />
+                </label>
+              </div>
+              <label class="checkline">
+                <input type="checkbox" data-path="notice1805.checkExactTime" />
+                Include "Please check with person named below for exact time and date"
+              </label>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="checklist">
+            <div class="panel-heading">
+              <p class="eyebrow">Opening packet</p>
+              <h2>Filing checklist</h2>
+            </div>
+            <div id="packetChecklist" class="checklist"></div>
+          </section>
+
+          <section class="panel" data-panel="service">
+            <div class="panel-heading">
+              <p class="eyebrow">PR-1817</p>
+              <h2>Declaration of service</h2>
+            </div>
+            <div class="grid two">
+              <label>Declarant name
+                <input data-path="service.declarantName" />
+              </label>
+              <label>Service date
+                <input type="date" data-path="service.serviceDate" />
+              </label>
+              <label>Declarant city
+                <input data-path="service.declarantCity" />
+              </label>
+              <label>Declarant state
+                <input data-path="service.declarantState" />
+              </label>
+              <label>Declarant address
+                <input data-path="service.declarantAddress" />
+              </label>
+              <label>Declarant email
+                <input type="email" data-path="service.declarantEmail" />
+              </label>
+              <label>Declarant phone
+                <input data-path="service.declarantPhone" />
+              </label>
+              <label>Declarant bar number
+                <input data-path="service.declarantBarNumber" />
+              </label>
+              <label>Type of service
+                <select data-path="service.method">
+                  <option value="">Select</option>
+                  <option value="Personal Service">Personal service</option>
+                  <option value="Mail">Mail</option>
+                  <option value="Certified mail return receipt requested">Certified mail return receipt requested</option>
+                </select>
+              </label>
+              <label>Signature date
+                <input type="date" data-path="service.signatureDate" />
+              </label>
+            </div>
+            <label>Documents provided
+              <textarea data-path="service.documentsProvided" rows="5"></textarea>
+            </label>
+            <div class="inline-checks">
+              <label class="checkline">
+                <input type="checkbox" data-path="service.originalOnFile" />
+                Original is on file
+              </label>
+              <label class="checkline">
+                <input type="checkbox" data-path="service.copyAttached" />
+                Copy is attached
+              </label>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="court">
+            <div class="panel-heading">
+              <p class="eyebrow">PR-1808 and PR-1810</p>
+              <h2>Court drafts</h2>
+            </div>
+            <div class="path-card">
+              <h3>Draft appointment forms</h3>
+              <p>These are proposed court forms. The probate registrar may revise, issue, or reject them.</p>
+            </div>
+            <div class="grid two">
+              <label>Personal representative bond
+                <select data-path="courtDrafts.prBondType">
+                  <option value="none">No bond required</option>
+                  <option value="signature">Signature bond</option>
+                  <option value="surety">Surety bond</option>
+                </select>
+              </label>
+              <label data-show-when="prSuretyBond">PR surety bond amount
+                <input data-path="courtDrafts.prBondAmount" inputmode="decimal" />
+              </label>
+              <label data-show-when="trustInvolved">Trustee bond
+                <select data-path="courtDrafts.trusteeBondType">
+                  <option value="none">No bond required</option>
+                  <option value="signature">Signature bond</option>
+                  <option value="surety">Surety bond</option>
+                </select>
+              </label>
+              <label data-show-when="trusteeSuretyBond">Trustee surety bond amount
+                <input data-path="courtDrafts.trusteeBondAmount" inputmode="decimal" />
+              </label>
+            </div>
+            <div class="inline-checks">
+              <label class="checkline">
+                <input type="checkbox" data-path="courtDrafts.otherFindingsSelected" />
+                Include other finding
+              </label>
+              <label class="checkline">
+                <input type="checkbox" data-path="courtDrafts.otherOrdersSelected" />
+                Include other order
+              </label>
+            </div>
+            <div class="grid two">
+              <label data-show-when="otherFinding">Other finding
+                <input data-path="courtDrafts.otherFindingsText" />
+              </label>
+              <label data-show-when="otherOrder">Other order
+                <input data-path="courtDrafts.otherOrdersText" />
+              </label>
+              <label>Other text for domiciliary letters
+                <input data-path="courtDrafts.lettersOtherText" />
+              </label>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="inventory">
+            <div class="panel-heading row-heading">
+              <div>
+                <p class="eyebrow">PR-1811</p>
+                <h2>Inventory</h2>
+              </div>
+              <button type="button" id="addInventoryBtn" class="secondary">Add item</button>
+            </div>
+            <div class="path-card">
+              <h3>Inventory totals</h3>
+              <p id="inventoryTotals">No inventory items entered.</p>
+            </div>
+            <div id="inventoryList" class="person-list"></div>
+            <div class="preparer-box">
+              <label>Inventory signature date
+                <input type="date" data-path="inventory.signatureDate" />
+              </label>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="tasks">
+            <div class="panel-heading">
+              <p class="eyebrow">Case workflow</p>
+              <h2>Tasks and deadlines</h2>
+            </div>
+            <div class="grid two">
+              <label>Waivers/service completed
+                <input type="date" data-path="deadlines.serviceCompletedDate" />
+              </label>
+              <label>First publication date
+                <input type="date" data-path="deadlines.firstPublicationDate" />
+              </label>
+              <label>Proof of publication received
+                <input type="date" data-path="deadlines.proofPublicationReceivedDate" />
+              </label>
+              <label>Letters issued date
+                <input type="date" data-path="deadlines.lettersIssuedDate" />
+              </label>
+              <label>Creditor claim deadline
+                <input type="date" data-path="deadlines.claimDeadline" />
+              </label>
+              <label>Inventory due date
+                <input type="date" data-path="deadlines.inventoryDueDate" />
+              </label>
+              <label>Inventory filed date
+                <input type="date" data-path="deadlines.inventoryFiledDate" />
+              </label>
+              <label>Closing review date
+                <input type="date" data-path="deadlines.closingReviewDate" />
+              </label>
+            </div>
+            <div id="taskList" class="task-list"></div>
+          </section>
+
+          <section class="panel" data-panel="requests">
+            <div class="panel-heading">
+              <p class="eyebrow">PR-1801 requests</p>
+              <h2>Requested orders and preparer</h2>
+            </div>
+            <div class="grid two">
+              <label>Domiciliary letters issued to
+                <input data-path="requests.domiciliaryLettersTo" />
+              </label>
+              <label data-show-when="trustInvolved">Trustee names
+                <input data-path="requests.trusteeNames" />
+              </label>
+              <label data-show-when="trustInvolved">Trust name
+                <input data-path="requests.trustName" />
+              </label>
+              <label data-show-when="otherRequest">Other request text
+                <input data-path="requests.otherText" />
+              </label>
+              <label data-show-when="question10Other">Question 10 other text
+                <input data-path="requests.question10OtherText" />
+              </label>
+            </div>
+            <div class="inline-checks">
+              <label class="checkline" data-show-when="trustInvolved">
+                <input type="checkbox" data-path="requests.appointTrustee" />
+                Appoint trustee
+              </label>
+              <label class="checkline" data-show-when="trustInvolved">
+                <input type="checkbox" data-path="requests.additionalTrusts" />
+                Additional trusts attached
+              </label>
+              <label class="checkline">
+                <input type="checkbox" data-path="requests.otherSelected" />
+                Other request
+              </label>
+              <label class="checkline">
+                <input type="checkbox" data-path="requests.question10OtherSelected" />
+                Question 10 other
+              </label>
+            </div>
+
+            <div class="preparer-box">
+              <div class="row-heading">
+                <h3>Form completed by</h3>
+                <button type="button" id="copyApplicantBtn" class="ghost">Use applicant</button>
+              </div>
+              <div class="grid two compact">
+                <label>Name
+                  <input data-path="preparer.fullName" />
+                </label>
+                <label>Address
+                  <input data-path="preparer.address" />
+                </label>
+                <label>Email
+                  <input type="email" data-path="preparer.email" />
+                </label>
+                <label>Phone
+                  <input data-path="preparer.phone" />
+                </label>
+                <label>State Bar number
+                  <input data-path="preparer.barNumber" />
+                </label>
+              </div>
+            </div>
+          </section>
+        </form>
+      </main>
+
+      <aside class="review" aria-live="polite">
+        <div class="review-card">
+          <div class="row-heading">
+            <div>
+              <p class="eyebrow">Live review</p>
+              <h2>PR-1801 status</h2>
+            </div>
+            <span id="statusBadge" class="badge">Draft</span>
+          </div>
+          <div id="issueList"></div>
+          <div class="summary" id="summary"></div>
+          <button type="button" id="generateBtn" class="primary">Generate PR-1801</button>
+          <button type="button" id="generate1803Btn" class="secondary full-width">Generate PR-1803</button>
+          <button type="button" id="generate1804Btn" class="secondary full-width">Generate PR-1804</button>
+          <button type="button" id="generate1806Btn" class="secondary full-width">Generate PR-1806</button>
+          <button type="button" id="generate1807Btn" class="secondary full-width">Generate PR-1807</button>
+          <button type="button" id="generate1808Btn" class="secondary full-width">Generate PR-1808</button>
+          <button type="button" id="generate1810Btn" class="secondary full-width">Generate PR-1810</button>
+          <button type="button" id="generate1811Btn" class="secondary full-width">Generate PR-1811</button>
+          <button type="button" id="generate1805Btn" class="secondary full-width">Generate PR-1805</button>
+          <button type="button" id="generate1817Btn" class="secondary full-width">Generate PR-1817</button>
+          <button type="button" id="exportPacketBtn" class="secondary full-width">Export opening packet ZIP</button>
+          <div id="downloadArea" class="download-area"></div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="app-footer">
+      <strong>Wisconsin Probate Forms</strong>
+      <span>Not a law firm. Not legal advice. Probate requirements may vary by county and case facts.</span>
+    </footer>
+
+    <script src="vendor/jszip.min.js"></script>
+    <script src="county-defaults.js"></script>
+    <script src="template-data.js"></script>
+    <script src="template-data-pr1803.js"></script>
+    <script src="template-data-pr1804.js"></script>
+    <script src="template-data-pr1806.js"></script>
+    <script src="template-data-pr1807.js"></script>
+    <script src="template-data-pr1808.js"></script>
+    <script src="template-data-pr1810.js"></script>
+    <script src="template-data-pr1811.js"></script>
+    <script src="template-data-pr1805.js"></script>
+    <script src="template-data-pr1817.js"></script>
+    <script src="platform-config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
