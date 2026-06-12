@@ -1,7 +1,17 @@
 const storageKey = "pr1801-prototype-state-v1";
 const ADDRESS_EXAMPLE = "Street address, City, State ZIP";
+const SIGNATURE_DATE_HELP = "Enter the date the form will be signed, or leave blank if the signature date is not known yet.";
 const BETA_UNLOCK_ENABLED = true;
 const PLATFORM_CONFIG = (typeof window !== "undefined" && window.PROBATE_PLATFORM_CONFIG) ? window.PROBATE_PLATFORM_CONFIG : {};
+const PLATFORM_LAUNCH_CONFIG = {
+  mode: BETA_UNLOCK_ENABLED ? "controlled_beta" : "production",
+  publicPaidLaunchAllowed: false,
+  betaPriceLabel: "$0 beta",
+  targetInformalProbatePrice: "$499 target launch price",
+  targetTransferAffidavitPrice: "$149 target launch price",
+  ...(PLATFORM_CONFIG.launch || {})
+};
+const CONTROLLED_BETA_MODE = PLATFORM_LAUNCH_CONFIG.mode !== "production" || BETA_UNLOCK_ENABLED;
 const COMPANY_CONFIG = {
   companyName: "Wisconsin Probate Forms",
   companyLegalName: "[Company Name TBD]",
@@ -43,7 +53,7 @@ const STANDARD_FORM_INTEGRITY_POLICY = {
   allowed: [
     "Map interview answers into official blank fields.",
     "Generate separate filing instructions, checklists, manifests, and read-me files outside the court form.",
-    "Keep court-editable drafts such as PR-1808 and PR-1810 in Word/editable format when that is the correct filing workflow."
+    "Keep Wisconsin eFiling Word/DOCX forms in editable format when required: PR-1801, PR-1804, PR-1805, and PR-1808."
   ],
   prohibited: [
     "Do not redesign the PR form.",
@@ -60,8 +70,11 @@ const OFFICIAL_FORM_TEMPLATE_VAULT = {
   pr1806: { formNumber: "PR-1806", title: "Proof of Heirship", localTemplate: "templates/PR-1806-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_pdf_overlay_needed" },
   pr1807: { formNumber: "PR-1807", title: "Consent to Serve as Personal Representative", localTemplate: "templates/PR-1807-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_pdf_overlay_needed" },
   pr1808: { formNumber: "PR-1808", title: "Statement of Informal Administration", localTemplate: "templates/PR-1808-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_word_court_draft" },
-  pr1810: { formNumber: "PR-1810", title: "Domiciliary Letters", localTemplate: "templates/PR-1810-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_word_court_draft" },
+  pr1810: { formNumber: "PR-1810", title: "Domiciliary Letters", localTemplate: "templates/PR-1810-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_pdf_overlay_needed" },
   pr1811: { formNumber: "PR-1811", title: "Inventory", localTemplate: "templates/PR-1811-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_later_stage" },
+  pr1814: { formNumber: "PR-1814", title: "Estate Account", localTemplate: "templates/PR-1814-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_later_stage" },
+  pr1815: { formNumber: "PR-1815", title: "Receipt", localTemplate: "templates/PR-1815-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_later_stage" },
+  pr1816: { formNumber: "PR-1816", title: "Closing Certificate", localTemplate: "templates/PR-1816-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_later_stage" },
   pr1817: { formNumber: "PR-1817", title: "Declaration of Service", localTemplate: "templates/PR-1817-template.docx", officialPdf: "", source: "Wisconsin Court System", outputStatus: "official_docx_registered_pdf_overlay_needed" },
   "transfer-affidavit": { formNumber: "PR-1831", title: "Transfer by Affidavit", localTemplate: "templates/PR-1831.pdf", officialPdf: "templates/PR-1831.pdf", source: "Wisconsin Court System", outputStatus: "official_pdf_registered_overlay_needed" }
 };
@@ -80,10 +93,10 @@ const FORM_FORMAT_CONFIG = {
     formNumber: "PR-1801",
     signatureWorkflow: "Applicant/preparer signature should be wet-signed before paper filing or scanned for eFiling.",
     publicPackage: "Print/sign official filing copy.",
-    attorneyEfileDefault: "Signed PDF after wet signature and exact overlay.",
-    wordCopy: "Editable working copy for correction before signature.",
-    pdfCopy: "Exact official PDF overlay is the production filing copy.",
-    efileDefault: "signed_pdf",
+    attorneyEfileDefault: "Word/DOCX for Wisconsin attorney eFiling; keep signed paper/scanned copy for signature records when needed.",
+    wordCopy: "Primary Word/DOCX eFiling copy plus editable working copy for corrections.",
+    pdfCopy: "PDF/print copy for public paper filing and signature records.",
+    efileDefault: "word_docx",
     pdfStatus: "overlay_pilot_started"
   },
   pr1803: {
@@ -100,20 +113,20 @@ const FORM_FORMAT_CONFIG = {
     formNumber: "PR-1804",
     signatureWorkflow: "Usually prepared for filing/publication rather than party signature; county/registrar details must be verified.",
     publicPackage: "Print/file/publish as county requires.",
-    attorneyEfileDefault: "PDF filing/publication copy.",
-    wordCopy: "Editable working copy for court/county details.",
-    pdfCopy: "Exact official PDF notice is the production target.",
-    efileDefault: "pdf",
+    attorneyEfileDefault: "Word/DOCX for Wisconsin attorney eFiling.",
+    wordCopy: "Primary Word/DOCX eFiling copy for court/county details.",
+    pdfCopy: "PDF/print copy for public filing/publication workflow.",
+    efileDefault: "word_docx",
     pdfStatus: "overlay_needed"
   },
   pr1805: {
     formNumber: "PR-1805",
     signatureWorkflow: "Notice copy for hearing/service path; signature handling depends on current court form and local practice.",
     publicPackage: "Print/file/serve/publish as county requires.",
-    attorneyEfileDefault: "PDF notice copy unless the county requests an editable notice.",
-    wordCopy: "Editable working copy for hearing/service details.",
-    pdfCopy: "Exact official PDF notice is the production target.",
-    efileDefault: "pdf_or_county_word",
+    attorneyEfileDefault: "Word/DOCX for Wisconsin attorney eFiling.",
+    wordCopy: "Primary Word/DOCX eFiling copy for hearing/service details.",
+    pdfCopy: "PDF/print copy for public service/publication workflow.",
+    efileDefault: "word_docx",
     pdfStatus: "overlay_needed"
   },
   pr1806: {
@@ -140,7 +153,7 @@ const FORM_FORMAT_CONFIG = {
     formNumber: "PR-1808",
     signatureWorkflow: "Prepared for Probate Registrar/court signature; parties usually submit the draft with the opening packet.",
     publicPackage: "Include a court draft with the opening packet if local practice accepts.",
-    attorneyEfileDefault: "Word/DOCX court-editable draft when required for eFiling or court issuance.",
+    attorneyEfileDefault: "Word/DOCX for Wisconsin attorney eFiling.",
     wordCopy: "Primary court-editable draft.",
     pdfCopy: "PDF preview/copy after review, not the only output.",
     efileDefault: "word_docx",
@@ -150,11 +163,11 @@ const FORM_FORMAT_CONFIG = {
     formNumber: "PR-1810",
     signatureWorkflow: "Prepared for court issuance/signature; parties usually submit the draft and wait for issued letters.",
     publicPackage: "Include a court draft with the opening packet if local practice accepts.",
-    attorneyEfileDefault: "Word/DOCX court-editable draft when required for eFiling or court issuance.",
-    wordCopy: "Primary court-editable draft.",
-    pdfCopy: "PDF preview/copy after review, not the only output.",
-    efileDefault: "word_docx",
-    pdfStatus: "word_primary"
+    attorneyEfileDefault: "PDF for Wisconsin attorney eFiling.",
+    wordCopy: "Editable working copy for review before creating the filing copy.",
+    pdfCopy: "PDF filing copy for attorney eFiling and public print/file workflow.",
+    efileDefault: "pdf",
+    pdfStatus: "overlay_needed"
   },
   pr1811: {
     formNumber: "PR-1811",
@@ -164,6 +177,36 @@ const FORM_FORMAT_CONFIG = {
     wordCopy: "Editable inventory working copy before signature.",
     pdfCopy: "Exact official PDF inventory is the production target.",
     efileDefault: "signed_pdf",
+    pdfStatus: "overlay_needed"
+  },
+  pr1814: {
+    formNumber: "PR-1814",
+    signatureWorkflow: "Personal representative signs or verifies account materials before filing as required.",
+    publicPackage: "Print/sign/file during closing or accounting stage.",
+    attorneyEfileDefault: "PDF for Wisconsin attorney eFiling.",
+    wordCopy: "Editable working copy before signature/final review.",
+    pdfCopy: "PDF filing copy is the production target.",
+    efileDefault: "pdf",
+    pdfStatus: "overlay_needed"
+  },
+  pr1815: {
+    formNumber: "PR-1815",
+    signatureWorkflow: "Recipient signs receipt or release before filing as required.",
+    publicPackage: "Print/sign/file during distribution or closing stage.",
+    attorneyEfileDefault: "PDF for Wisconsin attorney eFiling.",
+    wordCopy: "Editable working copy before signature/final review.",
+    pdfCopy: "PDF filing copy is the production target.",
+    efileDefault: "pdf",
+    pdfStatus: "overlay_needed"
+  },
+  pr1816: {
+    formNumber: "PR-1816",
+    signatureWorkflow: "Personal representative signs closing certificate before filing as required.",
+    publicPackage: "Print/sign/file during closing stage.",
+    attorneyEfileDefault: "PDF for Wisconsin attorney eFiling.",
+    wordCopy: "Editable working copy before signature/final review.",
+    pdfCopy: "PDF filing copy is the production target.",
+    efileDefault: "pdf",
     pdfStatus: "overlay_needed"
   },
   pr1817: {
@@ -230,6 +273,7 @@ function emptyState() {
       feedbackCanBecomeScenario: true,
       feedbackIssueId: "",
       feedbackSubmittedAt: "",
+      downloadFeedbackPromptedAt: "",
       launchConsent: false
     },
     pathRouter: {
@@ -279,6 +323,9 @@ function emptyState() {
       deliveryMode: "download",
       exportAudience: "public",
       agreedToTerms: false,
+      finalReviewAcknowledged: false,
+      finalDownloadedAt: "",
+      launchGateMode: CONTROLLED_BETA_MODE ? "controlled_beta" : "production",
       unlockedAt: ""
     },
     attorneyHandoff: {
@@ -363,12 +410,13 @@ function emptyState() {
       priorCaseNumber: "",
       namedPr: "",
       namedPrNone: false,
+      createsTestamentaryTrust: "",
       namedTrustee: "",
       namedTrusteeNone: false,
       nominatedTrustee: "",
       nominatedTrusteeNone: false,
       hasNamedBeneficiaries: "",
-      noWillDiligentInquiry: false
+      noWillDiligentInquiry: true
     },
     opening: {
       waiverStatus: "",
@@ -761,7 +809,7 @@ function emptyWillBeneficiary() {
 }
 
 function emptyHeirshipChild() {
-  return { name: "", address: "", livingStatus: "living", minorDateOfBirth: "", notes: "" };
+  return { name: "", address: "", livingStatus: "living", deceasedDate: "", descendants: "", minorDateOfBirth: "", notes: "" };
 }
 
 function emptyInventoryItem(category = "") {
@@ -772,36 +820,73 @@ function emptyTransferAsset() {
   return { type: "", holder: "", description: "", value: "", accountOrIdentifier: "", releaseInstructions: "", notes: "" };
 }
 
-function hasTrustInvolved(target = state) {
-  const requests = target.requests || {};
+function willCreatesTestamentaryTrust(target = state) {
   const will = target.will || {};
-  const courtDrafts = target.courtDrafts || {};
-  const trustText = [
+  if (will.createsTestamentaryTrust === "yes") return true;
+  if (will.createsTestamentaryTrust === "no") return false;
+  const requests = target.requests || {};
+  return [
     will.namedTrustee,
     will.nominatedTrustee,
     requests.trusteeNames,
     requests.trustName
   ].some(hasValue);
+}
+
+function clearWillTrustFields(target = state) {
+  if (!target.will) return;
+  target.will.namedTrustee = "";
+  target.will.namedTrusteeNone = true;
+  target.will.nominatedTrustee = "";
+  target.will.nominatedTrusteeNone = true;
+  if (target.requests) {
+    target.requests.trusteeNames = "";
+    target.requests.trustName = "";
+    target.requests.appointTrustee = false;
+    target.requests.additionalTrusts = false;
+  }
+  if (target.courtDrafts) {
+    target.courtDrafts.trusteeBondType = "none";
+    target.courtDrafts.trusteeBondAmount = "";
+  }
+}
+
+function handleWillTrustGate(path, value, target = state) {
+  if (path !== "will.createsTestamentaryTrust") return;
+  if (value === "no") clearWillTrustFields(target);
+}
+
+function handleWillStatusDefaults(path, value, target = state) {
+  if (path === "will.exists" && value === "no") {
+    target.will.noWillDiligentInquiry = true;
+  }
+}
+
+function hasTrustInvolved(target = state) {
+  const requests = target.requests || {};
+  const will = target.will || {};
+  const courtDrafts = target.courtDrafts || {};
+  const testamentaryTrust = will.exists === "yes" && willCreatesTestamentaryTrust(target);
   const trustRequests = Boolean(requests.appointTrustee || requests.additionalTrusts);
   const trusteeBond = courtDrafts.trusteeBondType && courtDrafts.trusteeBondType !== "none";
-  const willRoles = target.will?.hasNamedBeneficiaries === "yes" && (target.willBeneficiaries || []).some((person) => {
+  const willRoles = testamentaryTrust && target.will?.hasNamedBeneficiaries === "yes" && (target.willBeneficiaries || []).some((person) => {
     const text = `${person.role || ""} ${person.relationship || ""} ${person.notes || ""}`.toLowerCase();
     return text.includes("trust") || text.includes("trustee");
   });
-  const interestedRoles = (target.interestedPersons || []).some((person) => {
+  const interestedRoles = testamentaryTrust && (target.interestedPersons || []).some((person) => {
     const normalized = normalizeInterestedPerson(person);
     const text = `${normalized.relationship || ""}`.toLowerCase();
     return normalized.roles.trustee || normalized.roles.trustBeneficiary || text.includes("trust") || text.includes("trustee");
   });
-  return Boolean((will.exists === "yes" && (trustText || willRoles || interestedRoles)) || trustRequests || trusteeBond);
+  return Boolean(testamentaryTrust || willRoles || interestedRoles || trustRequests || trusteeBond);
 }
 
 function normalizeInterestedPerson(person = {}) {
   return mergeDeep(emptyInterestedPerson(), person);
 }
 
-function interestedPersonServiceStatus(person = {}) {
-  const normalized = applyInterestedPersonInferences(person);
+function interestedPersonServiceStatus(person = {}, target = state) {
+  const normalized = applyInterestedPersonInferences(person, {}, target);
   const roles = normalized.roles || {};
   const service = normalized.service || {};
   const locationStatus = service.locationStatus || "known";
@@ -816,7 +901,7 @@ function interestedPersonServiceStatus(person = {}) {
   const needsAttention = unknownOrMissing || unableToWaive || service.needsMailedNotice || missingAddress || !hasValue(waiverStatus);
   const reasons = [];
   if (!hasValue(waiverStatus)) reasons.push("waiver status not answered");
-  if (waiverStatus === "can_sign") reasons.push("can sign waiver");
+  if (waiverStatus === "can_sign") reasons.push("will sign waiver");
   if (waiverStatus === "cannot_sign") reasons.push("cannot sign waiver");
   if (waiverStatus === "will_not_sign") reasons.push("will not sign waiver");
   if (waiverStatus === "not_eligible") reasons.push("not eligible to sign waiver");
@@ -843,10 +928,10 @@ function interestedPersonServiceStatus(person = {}) {
 }
 
 function interestedPersonServiceSummary(data = state) {
-  const statuses = (data.interestedPersons || [])
-    .filter(hasInterestedPersonContent)
-    .map(interestedPersonServiceStatus);
+  const people = activeInterestedPersonsForNotice(data);
+  const statuses = people.map((person) => interestedPersonServiceStatus(person, data));
   const requiresNotice = statuses.some((status) => status.unableToWaive || status.unknownOrMissing || status.needsMailedNotice);
+  const rawUnansweredWaiverCount = people.filter((person) => !hasValue(person.service?.waiverStatus)).length;
   return {
     statuses,
     total: statuses.length,
@@ -856,8 +941,21 @@ function interestedPersonServiceSummary(data = state) {
     protectedCount: statuses.filter((status) => status.protectedPerson).length,
     mailedNoticeCount: statuses.filter((status) => status.needsMailedNotice).length,
     missingAddressCount: statuses.filter((status) => status.missingAddress).length,
-    unansweredWaiverCount: statuses.filter((status) => !hasValue(status.person.service?.waiverStatus)).length
+    unansweredWaiverCount: statuses.filter((status) => !hasValue(status.person.service?.waiverStatus)).length,
+    rawUnansweredWaiverCount
   };
+}
+
+function activeInterestedPersonsForNotice(target = state) {
+  return (target.interestedPersons || [])
+    .filter(hasInterestedPersonContent)
+    .map((person) => applyInterestedPersonInferences(person, {}, target))
+    .filter((person) => {
+      const roles = person.roles || {};
+      const independentBasis = Boolean(roles.beneficiary || roles.namedPr || roles.trustee || roles.trustBeneficiary);
+      if (personIsSurvivingCommonChild(person.name, target) && !independentBasis) return false;
+      return true;
+    });
 }
 
 function normalizeHeirshipChild(child = {}) {
@@ -865,7 +963,7 @@ function normalizeHeirshipChild(child = {}) {
 }
 
 function hasHeirshipChildContent(child = {}) {
-  return ["name", "address", "minorDateOfBirth", "notes"].some((key) => hasValue(child[key])) || child.livingStatus === "deceased";
+  return ["name", "address", "deceasedDate", "descendants", "minorDateOfBirth", "notes"].some((key) => hasValue(child[key])) || child.livingStatus === "deceased";
 }
 
 function childLine(child = {}) {
@@ -873,8 +971,106 @@ function childLine(child = {}) {
   const name = cleanText(normalized.name);
   if (!name) return "";
   const parts = [name];
-  if (normalized.livingStatus === "deceased") parts.push("deceased");
+  if (normalized.livingStatus === "deceased") parts.push(`deceased${documentDate(normalized.deceasedDate) ? ` ${documentDate(normalized.deceasedDate)}` : ""}`);
   return parts.filter(Boolean).join(" - ");
+}
+
+function childrenNamesForPr1806(children = state.heirship.children.people) {
+  return (children || [])
+    .filter(hasHeirshipChildContent)
+    .map((child) => cleanText(normalizeHeirshipChild(child).name))
+    .filter(Boolean)
+    .join("; ");
+}
+
+function childrenDeceasedDatesForPr1806(children = state.heirship.children.people) {
+  return (children || [])
+    .map(normalizeHeirshipChild)
+    .filter((child) => child.livingStatus === "deceased" && hasValue(child.name))
+    .map((child) => `${cleanText(child.name)}: ${documentDate(child.deceasedDate) || "date unknown"}`)
+    .join("; ");
+}
+
+function descendantEntryMeansNone(value = "") {
+  const text = cleanText(value).toLowerCase();
+  return /^(none|no|no children|no descendants|no issue|n\/a|unknown none)$/i.test(text);
+}
+
+function parseDescendantEntries(value = "", deceasedChildName = "", deceasedChildDate = "") {
+  return cleanText(value)
+    .split(/\n|;/)
+    .map(cleanText)
+    .filter(Boolean)
+    .filter((entry) => !descendantEntryMeansNone(entry))
+    .map((entry) => {
+      let childName = cleanText(deceasedChildName);
+      let body = entry;
+      const dashParts = entry.split(/\s+-\s+/);
+      if (!childName && dashParts.length > 1) {
+        childName = cleanText(dashParts.shift());
+        body = cleanText(dashParts.join(" - "));
+      }
+      const commaParts = body.split(/\s*,\s*/);
+      const name = cleanSuggestedPersonName(commaParts.shift() || body);
+      const address = commaParts.join(", ");
+      return {
+        deceasedChildName: childName,
+        deceasedChildDate: cleanText(deceasedChildDate),
+        name,
+        address,
+        raw: entry
+      };
+    })
+    .filter((entry) => hasSelectablePersonName(entry.name));
+}
+
+function deceasedHeirshipChildren(target = state) {
+  return (target.heirship?.children?.people || [])
+    .map(normalizeHeirshipChild)
+    .filter((child) => child.livingStatus === "deceased" && hasValue(child.name));
+}
+
+function deceasedChildDescendantEntries(target = state) {
+  const entries = [];
+  deceasedHeirshipChildren(target).forEach((child) => {
+    entries.push(...parseDescendantEntries(child.descendants, child.name, child.deceasedDate));
+  });
+  entries.push(...parseDescendantEntries(target.heirship?.children?.deceasedChildDescendants || ""));
+  const seen = new Set();
+  return entries.filter((entry) => {
+    const key = normalizedPersonName(entry.name);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function hasDeceasedChildDescendantDetails(target = state) {
+  return hasValue(target.heirship?.children?.deceasedChildDescendants)
+    || deceasedHeirshipChildren(target).some((child) => hasValue(child.descendants));
+}
+
+function deceasedChildrenMissingDescendantAnswer(target = state) {
+  return deceasedHeirshipChildren(target).filter((child) => {
+    if (hasValue(child.descendants)) return false;
+    if (hasValue(target.heirship?.children?.deceasedChildDescendants)) return false;
+    return true;
+  });
+}
+
+function pr1806DeceasedChildAttachmentRows(data = state) {
+  const rows = [];
+  deceasedHeirshipChildren(data).forEach((child) => {
+    const entries = parseDescendantEntries(child.descendants, child.name, child.deceasedDate);
+    const descendants = entries.length
+      ? entries.map((entry) => [entry.name, entry.address].filter(Boolean).join(", ")).join("; ")
+      : cleanText(child.descendants) || "(not entered)";
+    rows.push(`Deceased child in 3A: ${cleanText(child.name)}; date of death: ${documentDate(child.deceasedDate) || "unknown"}; children/descendants: ${descendants}`);
+  });
+  if (hasValue(data.heirship?.children?.deceasedChildDescendants)) {
+    rows.push(`Additional deceased-child descendant details: ${cleanText(data.heirship.children.deceasedChildDescendants)}`);
+  }
+  return rows;
 }
 
 function childrenTextFromPeople(children = state.heirship.children.people) {
@@ -986,6 +1182,8 @@ function bindFields() {
       const path = field.dataset.path;
       const value = field.type === "checkbox" ? field.checked : field.value;
       setPath(path, value);
+      handleWillTrustGate(path, value);
+      handleWillStatusDefaults(path, value);
       if ((path === "pr.sameAsApplicant" || path.startsWith("applicant.")) && state.pr.sameAsApplicant) {
         syncApplicantToPr();
       }
@@ -1013,6 +1211,10 @@ function bindFields() {
         state.heirship.children.people = [emptyHeirshipChild()];
       }
       if (path === "will.exists") {
+        renderWillBeneficiaries();
+        renderInterestedSuggestions();
+      }
+      if (path === "will.createsTestamentaryTrust") {
         renderWillBeneficiaries();
         renderInterestedSuggestions();
       }
@@ -1095,6 +1297,7 @@ function shouldShowConditional(condition) {
     willBeneficiariesYes: state.will.exists === "yes" && state.will.hasNamedBeneficiaries === "yes",
     hasCodicils: state.will.exists === "yes" && state.will.hasCodicils === "yes",
     willPriorCase: state.will.exists === "yes" && ["court", "probated_elsewhere"].includes(state.will.location),
+    willTestamentaryTrust: state.will.exists === "yes" && willCreatesTestamentaryTrust(),
     benefitExplanation: benefitNeedsExplanation,
     spouseYes: spouseExists === "yes",
     childrenYes: childrenExist === "yes",
@@ -1129,7 +1332,7 @@ const interviewSteps = [
         type: "choice",
         required: true,
         options: [
-          { label: "Family member", value: "family" },
+          { label: "Family member, Beneficiary, Interested Party", value: "family" },
           { label: "Nominated PR", value: "nominated_pr" },
           { label: "Attorney", value: "attorney" },
           { label: "Paralegal", value: "paralegal" }
@@ -1245,9 +1448,19 @@ const interviewSteps = [
     fields: [
       { path: "applicant.email", label: "Email", type: "email", required: false },
       { path: "applicant.phone", label: "Phone", type: "tel", required: false },
-      { path: "applicant.signatureDate", label: "Signature date", type: "date", required: false },
-      { path: "applicant.barNumber", label: "State Bar number", required: false }
+      { path: "applicant.signatureDate", label: "Signature date (optional)", type: "date", required: false, help: SIGNATURE_DATE_HELP },
+      { path: "applicant.barNumber", label: "Attorney State Bar number (if attorney)", required: false }
     ]
+  },
+  {
+    id: "preparer",
+    group: "Applicant",
+    title: "Who is preparing these forms?",
+    help: "This fills the preparer/signature contact area on the generated forms. For most public users, it will be the applicant.",
+    render: renderGuidedPreparer,
+    complete: () => guidedPreparerComplete(),
+    statusMessage: () => guidedPreparerMessage(),
+    fields: []
   },
   {
     id: "personal-rep",
@@ -1289,6 +1502,7 @@ const interviewSteps = [
     id: "resident-agent",
     group: "Personal Representative",
     title: "Who is the Wisconsin resident agent?",
+    help: "If the proposed Personal Representative does not live in Wisconsin, PR-1807 asks for a Wisconsin resident agent. A resident agent is a Wisconsin resident who can receive probate papers for the nonresident PR. This software only collects the form information and does not decide who should serve.",
     visible: () => state.pr.isWisconsinResident === "no",
     fields: [
       { path: "pr.residentAgent.name", label: "Resident agent name" },
@@ -1365,7 +1579,7 @@ const interviewSteps = [
   {
     id: "will-beneficiaries",
     group: "Will",
-    title: "Does the will name beneficiaries or trust beneficiaries?",
+    title: "Who receives property under the will?",
     help: "For opening, collect names and mailing addresses for notice and waivers. Asset values and specific bequest details can wait for inventory and accounting.",
     visible: () => state.will.exists === "yes",
     render: renderGuidedWillBeneficiaries,
@@ -1392,13 +1606,11 @@ const interviewSteps = [
   {
     id: "heirship-informant",
     group: "Heirship",
-    title: "Who will answer the heirship questions?",
-    fields: [
-      { type: "partySelect", label: "Choose from people already entered", target: "heirshipInformant", required: false },
-      { path: "heirship.informant.name", label: "Name" },
-      { path: "heirship.informant.relationship", label: "Relationship to decedent" },
-      { path: "heirship.informant.address", label: "Mailing address" }
-    ]
+    title: "Who can answer the family-tree questions?",
+    render: renderGuidedHeirshipInformant,
+    complete: () => guidedHeirshipInformantComplete(),
+    statusMessage: () => guidedHeirshipInformantMessage(),
+    fields: []
   },
   {
     id: "spouse",
@@ -1516,7 +1728,7 @@ const interviewSteps = [
   {
     id: "people-roster",
     group: "People",
-    title: "Who is in this case so far?",
+    title: "Review the people found so far.",
     help: "This master roster merges applicant, PR, will, heirship, beneficiary, and interested-person answers so duplicates are easier to spot before notices or waivers are prepared.",
     render: renderMasterPeopleRoster,
     complete: () => peopleRosterStatus().missingSuggested === 0,
@@ -1526,8 +1738,8 @@ const interviewSteps = [
   {
     id: "interested-person",
     group: "Interested Persons",
-    title: "Who should receive notice or sign a waiver?",
-    help: "Start by adding the people suggested from the will, heirship, applicant, and proposed PR answers.",
+    title: "Select the interested persons.",
+    help: "Add the suggested heirs, beneficiaries, named fiduciaries, and any other people or entities who should receive notice or sign a waiver.",
     render: renderGuidedInterestedSuggestions,
     complete: () => guidedInterestedSuggestionsComplete(),
     statusMessage: () => guidedInterestedSuggestionsMessage(),
@@ -1546,8 +1758,8 @@ const interviewSteps = [
   {
     id: "interested-service",
     group: "Interested Persons",
-    title: "Can each interested person sign a waiver?",
-    help: "This step drives whether the case can open on PR-1803 waivers or needs PR-1805 notice.",
+    title: "Who will sign a PR-1803 waiver, and who needs notice?",
+    help: "PR-1803 is the waiver and consent form. Use this step to decide who will sign a waiver and who may need mailed notice or PR-1805 review.",
     render: renderGuidedInterestedService,
     complete: () => guidedInterestedServiceComplete(),
     statusMessage: () => guidedInterestedServiceMessage(),
@@ -1577,7 +1789,7 @@ const interviewSteps = [
     id: "opening-path",
     group: "Opening Path",
     title: "Can this estate open on waivers, or does it need notice?",
-    help: "Answer who can sign, who cannot be found, and whether publication will be needed. The app will show the packet result immediately.",
+    help: "Answer who is expected to sign, who cannot be found, and whether publication will be needed. The app will show the packet result immediately.",
     render: renderOpeningPathInterview,
     complete: () => openingPathInterviewComplete(),
     statusMessage: () => openingPathInterviewMessage(),
@@ -1602,6 +1814,16 @@ const interviewSteps = [
     render: renderOpeningDocsHandoff,
     complete: () => openingDocumentReadiness().ready,
     statusMessage: () => openingDocumentReadinessMessage(),
+    fields: []
+  },
+  {
+    id: "final-review-download",
+    group: "Opening Path",
+    title: "Final Review Before Download",
+    help: "Review the packet, signers, missing information, interested-person treatment, and user agreement before unlocking the final download.",
+    render: renderFinalReviewBeforeDownload,
+    complete: () => finalReviewBeforeDownloadComplete(),
+    statusMessage: () => finalReviewBeforeDownloadMessage(),
     fields: []
   },
   {
@@ -1655,6 +1877,7 @@ const interviewNavLabels = {
   "decedent-benefits": "Benefits",
   "applicant-name": "Applicant",
   "applicant-contact": "Contact",
+  preparer: "Preparer",
   "personal-rep": "PR choice",
   "personal-rep-details": "PR details",
   "resident-agent": "Resident agent",
@@ -1680,6 +1903,7 @@ const interviewNavLabels = {
   "opening-path": "Opening path",
   "attorney-handoff": "Attorney review",
   "opening-docs-ready": "Packet ready",
+  "final-review-download": "Final review",
   "opening-filing-instructions": "Filing instructions",
   "post-opening-handoff": "Letters issued",
   "inventory-starter": "Inventory",
@@ -1826,6 +2050,14 @@ function activateEditStep(stepName) {
   document.querySelectorAll(".panel").forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === stepName));
 }
 
+function openTaskTracker() {
+  setViewMode("edit");
+  activateEditStep("tasks");
+  window.requestAnimationFrame(() => {
+    document.querySelector('[data-panel="tasks"]')?.scrollIntoView({ block: "start" });
+  });
+}
+
 function bindModeControls() {
   document.getElementById("funnelModeBtn")?.addEventListener("click", () => setViewMode("funnel"));
   document.querySelectorAll("[data-funnel-start]").forEach((button) => {
@@ -1858,6 +2090,8 @@ function bindModeControls() {
   document.getElementById("runAllScenariosBtn")?.addEventListener("click", renderScenarioView);
   document.getElementById("editModeBtn")?.addEventListener("click", () => setViewMode("edit"));
   document.getElementById("interviewEditBtn")?.addEventListener("click", () => setViewMode("edit"));
+  document.getElementById("returnGuidedFromEditBtn")?.addEventListener("click", () => setViewMode("guided"));
+  document.getElementById("tasksShortcutBtn")?.addEventListener("click", openTaskTracker);
 }
 
 function bindInterviewControls() {
@@ -1975,6 +2209,12 @@ function renderInterviewField(field) {
   control.addEventListener("input", () => updateInterviewState(field.path, control.value, { rerender: false }));
   control.addEventListener("change", () => updateInterviewState(field.path, control.value, { rerender: field.type === "select" }));
   label.appendChild(control);
+  if (field.help) {
+    const help = document.createElement("span");
+    help.className = "field-hint";
+    help.textContent = field.help;
+    label.appendChild(help);
+  }
   return label;
 }
 
@@ -2025,6 +2265,8 @@ function valuesEqual(first, second) {
 
 function updateInterviewState(path, value, options = {}) {
   setPath(path, value);
+  handleWillTrustGate(path, value);
+  handleWillStatusDefaults(path, value);
   if ((path === "pr.sameAsApplicant" || path.startsWith("applicant.")) && state.pr.sameAsApplicant) {
     syncApplicantToPr();
   }
@@ -2052,6 +2294,10 @@ function updateInterviewState(path, value, options = {}) {
     state.heirship.children.people = [emptyHeirshipChild()];
   }
   if (path === "will.exists") {
+    renderWillBeneficiaries();
+    renderInterestedSuggestions();
+  }
+  if (path === "will.createsTestamentaryTrust") {
     renderWillBeneficiaries();
     renderInterestedSuggestions();
   }
@@ -2137,7 +2383,11 @@ function renderInterviewStatus() {
     progress.appendChild(item);
   });
   if (back) back.disabled = index === 0;
-  if (next) next.textContent = index >= steps.length - 1 ? "Review answers" : "Next";
+  if (next) {
+    const transferAffidavitStop = current.id === "transfer-affidavit" && probatePathDecision().productKey === "transfer_affidavit";
+    next.disabled = transferAffidavitStop;
+    next.textContent = transferAffidavitStop ? "Use the download options above" : index >= steps.length - 1 ? "Review answers" : "Next";
+  }
   if (message) {
     if (typeof current.statusMessage === "function") {
       message.textContent = current.statusMessage();
@@ -2331,16 +2581,45 @@ function productLadderHtml() {
         const info = productInfo(key);
         const active = route.productKey === key;
         return `
-          <section class="product-card ${active ? "active" : ""}">
+          <section class="product-card ${active ? "active" : ""}" role="button" tabindex="0" data-product-jump="${escapeAttr(key)}">
             <span class="badge ${active ? "" : "warn"}">${active ? "Recommended next step" : "Software package"}</span>
             <h4>${escapeHtml(info.title)}</h4>
             <strong>${escapeHtml(info.price)}</strong>
             <p>${escapeHtml(info.free)}</p>
+            <span class="card-action">${active ? "Continue here" : "Review this option"}</span>
           </section>
         `;
       }).join("")}
     </div>
   `;
+}
+
+function productJumpTarget(key) {
+  const route = probatePathDecision();
+  if (key === "transfer_affidavit") return route.productKey === "transfer_affidavit" ? "transfer-affidavit" : "path-router";
+  if (key === "informal_probate") return "county";
+  if (key === "information_summary" || key === "attorney_handoff") return "attorney-handoff";
+  return "path-router";
+}
+
+function bindProductLadder(root) {
+  root.querySelectorAll("[data-product-jump]").forEach((card) => {
+    const openTarget = () => {
+      const target = productJumpTarget(card.dataset.productJump);
+      if (target === "attorney-handoff" && !visibleInterviewSteps().some((step) => step.id === target)) {
+        setViewMode("forms");
+        return;
+      }
+      goToInterviewStep(target);
+    };
+    card.addEventListener("click", openTarget);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openTarget();
+      }
+    });
+  });
 }
 
 function pathRouterStarted() {
@@ -2377,8 +2656,14 @@ function renderProbatePathRouter() {
     <div class="guided-person-card">
       <h3>About how much probate property is involved?</h3>
       <p>Use a rough gross value for assets that would need probate transfer. This can be corrected later.</p>
+    </div>
+    <div class="starter-input-card">
+      <div>
+        <span class="start-input-badge">Start here</span>
+        <h3>Enter the estimated probate property value</h3>
+      </div>
       <label class="interview-label">Estimated probate property value
-        <input data-guided-path="pathRouter.grossValue" value="${escapeAttr(state.pathRouter.grossValue || state.estate.estimatedGrossValue)}" inputmode="decimal" placeholder="85000" />
+        <input class="starter-money-input" data-guided-path="pathRouter.grossValue" value="${escapeAttr(state.pathRouter.grossValue || state.estate.estimatedGrossValue)}" inputmode="decimal" placeholder="85000" />
       </label>
     </div>
     <div class="route-question">
@@ -2447,6 +2732,7 @@ function renderProbatePathRouter() {
   `;
   bindGuidedPathInputs(wrapper);
   bindGuidedChoiceButtons(wrapper);
+  bindProductLadder(wrapper);
   return wrapper;
 }
 
@@ -2488,7 +2774,7 @@ function transferAffidavitReadiness(data = state) {
   if (elapsed !== null && elapsed < 30 && tba.daysSinceDeathConfirmed !== "yes") {
     blockers.push("Confirm that the waiting period after death is satisfied before relying on the affidavit path.");
   }
-  if (!hasValue(tba.daysSinceDeathConfirmed)) blockers.push("Confirm the waiting-period question.");
+  if (!hasValue(tba.daysSinceDeathConfirmed)) blockers.push("Confirm whether at least 30 days have passed since death.");
   if (tba.daysSinceDeathConfirmed === "no") blockers.push("Transfer by Affidavit should wait until the statutory waiting period is satisfied.");
   if (!hasValue(tba.noPendingProbate)) blockers.push("Confirm whether a probate proceeding is already pending.");
   if (tba.noPendingProbate === "no") blockers.push("A pending probate proceeding should be reviewed before using the affidavit path.");
@@ -2634,17 +2920,9 @@ function renderTransferAffidavitInterview() {
   wrapper.innerHTML = `
     ${routeResultHtml(probatePathDecision())}
     ${transferAffidavitReadinessHtml(readiness)}
-    <div class="handoff-card ${readiness.blockers.length ? "warn" : "ready"}">
-      <p class="eyebrow">Transfer by Affidavit MVP</p>
-      <h3>${readiness.blockers.length ? "Finish the affidavit facts before export" : "Affidavit package is ready for prototype export"}</h3>
-      <p>This MVP creates a draft affidavit worksheet, asset release checklist, and case summary. Replace this with the official Wisconsin PR-1831 template before production filing.</p>
-      <div class="handoff-actions">
-        <button type="button" class="primary" data-export-transfer-affidavit ${readiness.blockers.length ? "disabled" : ""}>Download Transfer by Affidavit package</button>
-        <button type="button" class="secondary" data-continue-informal-probate>Continue to informal probate instead</button>
-      </div>
-      <div id="guidedDownloadArea" class="download-area"></div>
+    <div class="guided-note compact">
+      <p>Complete the affidavit questions below. The unlock and download step is at the bottom, after the required facts.</p>
     </div>
-    ${paymentGateHtml("transfer", "transfer_affidavit")}
     <div class="guided-person-card">
       <h3>Affiant</h3>
       <p>The affiant is the person asking the holder to transfer the decedent's property.</p>
@@ -2683,7 +2961,8 @@ function renderTransferAffidavitInterview() {
       </div>
     </div>
     <div class="route-question">
-      <h3>Is the affidavit waiting period satisfied?</h3>
+      <h3>Have at least 30 days passed since the date of death?</h3>
+      <p class="question-helper">This is the waiting-period check for the Wisconsin Transfer by Affidavit workflow. Confirm the exact rule before relying on the final filing packet.</p>
       <div class="choice-grid">
         ${guidedChoiceButtonHtml("transferAffidavit.daysSinceDeathConfirmed", "yes", "Yes")}
         ${guidedChoiceButtonHtml("transferAffidavit.daysSinceDeathConfirmed", "no", "No")}
@@ -2691,7 +2970,7 @@ function renderTransferAffidavitInterview() {
       </div>
     </div>
     <div class="route-question">
-      <h3>Is there already a probate proceeding pending?</h3>
+      <h3>Has anyone already opened a probate case for this estate?</h3>
       <div class="choice-grid">
         ${guidedChoiceButtonHtml("transferAffidavit.noPendingProbate", "yes", "No pending probate")}
         ${guidedChoiceButtonHtml("transferAffidavit.noPendingProbate", "no", "Yes, something is pending")}
@@ -2699,7 +2978,7 @@ function renderTransferAffidavitInterview() {
       </div>
     </div>
     <div class="route-question">
-      <h3>Are all people entitled to the property known?</h3>
+      <h3>Do you know everyone who should receive the property?</h3>
       <div class="choice-grid">
         ${guidedChoiceButtonHtml("transferAffidavit.entitledPersonsKnown", "yes", "Yes")}
         ${guidedChoiceButtonHtml("transferAffidavit.entitledPersonsKnown", "no", "No")}
@@ -2713,7 +2992,7 @@ function renderTransferAffidavitInterview() {
       </label>
     </div>
     <div class="route-question">
-      <h3>Does the package include real estate, a vehicle, public-benefits follow-up, or creditor concerns?</h3>
+      <h3>Are there any special transfer issues?</h3>
       <div class="grid two compact">
         <label>Real estate included?
           <select data-guided-path="transferAffidavit.realEstateIncluded">
@@ -2770,6 +3049,17 @@ function renderTransferAffidavitInterview() {
     <label class="interview-label">Affidavit package notes
       <textarea rows="3" data-guided-path="transferAffidavit.notes" placeholder="Holder requirements, title issues, contact notes, or county recording questions">${escapeHtml(state.transferAffidavit.notes)}</textarea>
     </label>
+    <div class="handoff-card ${readiness.blockers.length ? "warn" : "ready"}">
+      <p class="eyebrow">Transfer by Affidavit package</p>
+      <h3>${readiness.blockers.length ? "Finish the affidavit facts before download" : "Ready to unlock and download"}</h3>
+      <p>This creates a draft affidavit package, asset release checklist, and case summary. The official PR-1831 template still needs final production mapping before live use.</p>
+      ${readiness.blockers.length ? "" : paymentGateHtml("transfer", "transfer_affidavit")}
+      <div class="handoff-actions">
+        <button type="button" class="primary" data-export-transfer-affidavit ${readiness.blockers.length ? "disabled" : ""}>Download Transfer by Affidavit package</button>
+        <button type="button" class="secondary" data-continue-informal-probate>Continue to informal probate instead</button>
+      </div>
+      <div id="guidedDownloadArea" class="download-area"></div>
+    </div>
     <div class="guided-note warn">
       <p>Production task: add and map the official Wisconsin PR-1831 Transfer by Affidavit form. This MVP package is for workflow and product testing.</p>
     </div>
@@ -2930,7 +3220,7 @@ function renderGuidedSpouseHistory() {
     ${state.spouse.everMarried === "yes" ? `
       <div class="guided-person-card">
         <div class="grid two compact">
-          <label>Name
+          <label>Spouse/domestic partner name
             <input data-guided-path="spouse.fullName" value="${escapeAttr(state.spouse.fullName || state.heirship.spouse.name)}" />
           </label>
           <label>Living status
@@ -3118,16 +3408,18 @@ function existingParties() {
       relationship: "Named Personal Representative",
       source: "Will"
     });
-    addExistingParty(parties, {
-      name: state.will.namedTrustee,
-      relationship: "Trustee named in will",
-      source: "Will"
-    });
-    addExistingParty(parties, {
-      name: state.will.nominatedTrustee,
-      relationship: "Nominated trustee",
-      source: "Will"
-    });
+    if (willCreatesTestamentaryTrust()) {
+      addExistingParty(parties, {
+        name: state.will.namedTrustee,
+        relationship: "Trustee named for will-created trust",
+        source: "Will"
+      });
+      addExistingParty(parties, {
+        name: state.will.nominatedTrustee,
+        relationship: "Nominated trustee for will-created trust",
+        source: "Will"
+      });
+    }
     if (state.will.hasNamedBeneficiaries === "yes") {
       state.willBeneficiaries.forEach((person) => addExistingParty(parties, {
         name: person.name,
@@ -3418,10 +3710,12 @@ function applyExistingParty(target, index, party) {
     state.will.namedPrNone = false;
   }
   if (target === "willNamedTrustee") {
+    state.will.createsTestamentaryTrust = "yes";
     state.will.namedTrustee = party.name;
     state.will.namedTrusteeNone = false;
   }
   if (target === "willNominatedTrustee") {
+    state.will.createsTestamentaryTrust = "yes";
     state.will.nominatedTrustee = party.name;
     state.will.nominatedTrusteeNone = false;
   }
@@ -3437,8 +3731,8 @@ function applyExistingParty(target, index, party) {
 
 function willBeneficiaryRoleFromParty(party, currentRole = "beneficiary") {
   const text = cleanText(party.relationship).toLowerCase();
-  if (text.includes("trust beneficiary")) return "trust_beneficiary";
-  if (text.includes("trustee")) return "trustee";
+  if (willCreatesTestamentaryTrust() && text.includes("trust beneficiary")) return "trust_beneficiary";
+  if (willCreatesTestamentaryTrust() && text.includes("trustee")) return "trustee";
   if (text.includes("codicil")) return "codicil_beneficiary";
   if (text.includes("organization") || text.includes("charity")) return "entity";
   if (text.includes("beneficiary")) return "beneficiary";
@@ -3478,11 +3772,15 @@ function guidedWillBeneficiariesComplete() {
 }
 
 function guidedWillBeneficiariesMessage() {
-  if (!hasValue(state.will.hasNamedBeneficiaries)) return "Answer whether the will names beneficiaries or trust beneficiaries.";
+  if (!hasValue(state.will.hasNamedBeneficiaries)) return "Answer whether the will names beneficiaries or organizations.";
   if (state.will.hasNamedBeneficiaries === "no") return "";
   if (state.will.hasNamedBeneficiaries === "unknown") return "Review the will before relying on the interested-person list.";
   const people = state.willBeneficiaries.filter(hasWillBeneficiaryContent);
-  if (!people.length) return "Because this is marked Yes, add each named beneficiary, trust beneficiary, organization, or trustee who should receive notice.";
+  if (!people.length) {
+    return willCreatesTestamentaryTrust()
+      ? "Because this is marked Yes, add each named beneficiary, trust beneficiary, organization, or trustee who should receive notice."
+      : "Because this is marked Yes, add each named beneficiary or organization who should receive notice.";
+  }
   const missing = people.filter((person) => !hasValue(person.name) || !hasValue(person.address)).length;
   return missing ? `${missing} named person still needs a name or mailing address.` : "";
 }
@@ -3588,6 +3886,9 @@ function interestedPersonAuditDecisionText(person = {}, status = "excluded", ser
     return "The app found a likely interested-person reason, but this person or entity has not been added to the active list yet.";
   }
   const text = cleanText(relationshipText([person.relationship, person.source])).toLowerCase();
+  if (personIsSurvivingCommonChild(person.name || "", state)) {
+    return "Excluded from waiver/notice/service treatment based on the current no-will answers: a surviving spouse exists and all surviving children are also children of that spouse, so the child is not treated as an intestate heir solely from PR-1806 heirship answers.";
+  }
   if (text.includes("resident agent")) return "Excluded for now because a resident agent is not automatically an interested person unless also an heir, beneficiary, fiduciary, trustee, or other required party.";
   if (text.includes("informant")) return "Excluded for now because the proof-of-heirship informant is not automatically an interested person unless another answer makes them one.";
   return "Excluded from waiver/notice/service treatment for now because the current answers do not show an heir, beneficiary, fiduciary, trustee, or other interested-person basis.";
@@ -3596,7 +3897,7 @@ function interestedPersonAuditDecisionText(person = {}, status = "excluded", ser
 function interestedPersonAuditActionText(person = {}, status = "excluded", service = null) {
   if (status === "included") {
     if (service?.missingAddress) return "Confirm the mailing address before relying on waivers, notice, or service.";
-    if (!hasValue(service?.person?.service?.waiverStatus)) return "Answer whether this person can sign a waiver.";
+    if (!hasValue(service?.person?.service?.waiverStatus)) return "Answer whether this person is expected to sign a waiver.";
     if (service?.unknownOrMissing || service?.needsMailedNotice) return "Use this service status when deciding PR-1803 waiver vs. PR-1805 notice.";
     return "Keep included if this person should receive notice or sign a waiver.";
   }
@@ -3615,8 +3916,8 @@ function interestedPersonSourceReasons(person, matchingSuggestions = []) {
   if (sameName(normalized.name, state.applicant.fullName)) reasons.push("Applicant");
   if (sameName(normalized.name, state.pr.fullName)) reasons.push("Proposed Personal Representative");
   if (state.will.exists === "yes" && sameName(normalized.name, state.will.namedPr)) reasons.push("Personal Representative named in will");
-  if (state.will.exists === "yes" && sameName(normalized.name, state.will.namedTrustee)) reasons.push("Trustee named in will");
-  if (state.will.exists === "yes" && sameName(normalized.name, state.will.nominatedTrustee)) reasons.push("Nominated trustee");
+  if (state.will.exists === "yes" && willCreatesTestamentaryTrust() && sameName(normalized.name, state.will.namedTrustee)) reasons.push("Trustee named for will-created trust");
+  if (state.will.exists === "yes" && willCreatesTestamentaryTrust() && sameName(normalized.name, state.will.nominatedTrustee)) reasons.push("Nominated trustee for will-created trust");
   if (sameName(normalized.name, state.heirship.spouse.name)) reasons.push("Surviving spouse/domestic partner");
   if (roles.heir) reasons.push("Heir");
   if (roles.beneficiary) reasons.push("Will beneficiary");
@@ -3631,9 +3932,117 @@ function interestedPersonSourceReasons(person, matchingSuggestions = []) {
   return unique.length ? unique : ["Manually added"];
 }
 
+function interestedPersonForAuditItem(item = {}) {
+  if (item.service?.person) return normalizeInterestedPerson(item.service.person);
+  return normalizeInterestedPerson({
+    name: item.name,
+    relationship: item.relationship,
+    address: item.address,
+    roles: item.roles || {}
+  });
+}
+
+function interestedPersonAuditTreatmentLabel(item = {}) {
+  if (item.status === "suggested") return "Suggested for interested-person review";
+  if (item.status === "excluded") return "Not in active waiver/notice list";
+  const service = item.service;
+  if (!service) return "Treatment not checked";
+  if (service.canSignWaiver) return "Expected PR-1803 waiver signer";
+  if (service.unknownOrMissing) return "Unknown/not located notice issue";
+  if (service.needsMailedNotice) return "Needs mailed notice/service handling";
+  if (service.protectedPerson) return "Minor/protected-person review";
+  if (!hasValue(service.person?.service?.waiverStatus)) return "Waiver answer needed";
+  return "Included for notice/waiver review";
+}
+
+function interestedPersonLegalAuditRows(item = {}) {
+  const person = interestedPersonForAuditItem(item);
+  const roles = person.roles || {};
+  const service = item.service || interestedPersonServiceStatus(person);
+  const text = relationshipText([person.relationship, item.relationship, item.source, ...(item.reasons || [])]).toLowerCase();
+  const rows = [];
+  const add = (key, label, detail, tone = "") => {
+    if (!rows.some((row) => row.key === key)) rows.push({ key, label, detail, tone });
+  };
+
+  if (personIsSurvivingCommonChild(person.name || item.name || "", state) && !roles.heir) {
+    add("common-child-excluded", "Common child not treated as intestate heir", "Current no-will answers say a surviving spouse exists and all surviving children are also children of that spouse. The app keeps this person in the family tree but does not add them solely as an interested person.", "warn");
+  } else if (roles.heir || /\b(heir|child|descendant|spouse|domestic partner|parent|sibling|brother|sister|grandparent)\b/.test(text)) {
+    add("heir", "Heir/heirship", "Carried from spouse, child, descendant, parent, sibling, or other heirship answers.");
+  }
+  if (roles.beneficiary || /\b(beneficiary|codicil|organization|charity)\b/.test(text)) {
+    add("beneficiary", "Will beneficiary", "Named in the will/codicil or beneficiary list for notice and waiver review.");
+  }
+  if (roles.namedPr || /\b(personal representative|proposed pr|named pr|fiduciary)\b/.test(text)) {
+    add("fiduciary", "Fiduciary role", "Applicant, proposed PR, or person named in the will for a fiduciary role.");
+  }
+  if (roles.trustee || roles.trustBeneficiary || /\b(trustee|trust beneficiary|will-created trust)\b/.test(text)) {
+    add("trust", "Trust role", "Trustee or trust beneficiary connected to a will-created trust or trust-related probate request.", "warn");
+  }
+  if (roles.minor || roles.needsGuardian || hasValue(person.minorDateOfBirth) || service.protectedPerson) {
+    add("minor", "Minor/protected person", "Do not rely on ordinary waiver handling without guardian/agent or legal review.", "warn");
+  }
+  if (roles.military) {
+    add("military", "Military service", "Military-service status may affect default, notice, or service treatment.", "warn");
+  }
+  if (service.missingAddress) {
+    add("address", "Mailing address issue", "A complete mailing address is needed before relying on waivers, notices, or service.", "warn");
+  }
+  if (service.canSignWaiver) {
+    add("waiver", "Waiver treatment", "Current answers say this person is expected to sign PR-1803.");
+  } else if (service.unknownOrMissing || service.needsMailedNotice) {
+    add("notice", "Notice/service treatment", "Current answers point to mailed notice, PR-1805 review, or service tracking.", "warn");
+  } else if (item.status === "included" && !hasValue(service.person?.service?.waiverStatus)) {
+    add("waiver-needed", "Waiver answer needed", "Choose whether this person will sign a waiver or needs notice.", "warn");
+  }
+  if (item.status === "suggested") {
+    add("suggested", "Suggested but not added", "The app found a source reason, but this person/entity is not in the active interested-person list.", "warn");
+  }
+  if (item.status === "excluded") {
+    add("excluded", "Excluded from active list", "Current answers do not place this person/entity in the active waiver/notice/service list.", "bad");
+  }
+  if (!rows.length) {
+    add("manual-review", "Manual review", "No automatic legal category was detected; confirm whether this person/entity belongs in the interested-person list.", "warn");
+  }
+  return rows;
+}
+
+function interestedPersonLegalAuditSummary(items = interestedPersonSourceReviewItems()) {
+  const summary = {
+    included: items.filter((item) => item.status === "included").length,
+    suggested: items.filter((item) => item.status === "suggested").length,
+    excluded: items.filter((item) => item.status === "excluded").length,
+    heirs: 0,
+    willBeneficiaries: 0,
+    fiduciaries: 0,
+    trustRoles: 0,
+    minorProtected: 0,
+    missingAddress: 0,
+    waiverSigners: 0,
+    noticeOrService: 0,
+    serviceAttention: 0
+  };
+  items.forEach((item) => {
+    const categories = interestedPersonLegalAuditRows(item).map((row) => row.key);
+    if (categories.includes("heir")) summary.heirs += 1;
+    if (categories.includes("beneficiary")) summary.willBeneficiaries += 1;
+    if (categories.includes("fiduciary")) summary.fiduciaries += 1;
+    if (categories.includes("trust")) summary.trustRoles += 1;
+    if (categories.includes("minor")) summary.minorProtected += 1;
+    if (categories.includes("address")) summary.missingAddress += 1;
+    if (categories.includes("waiver")) summary.waiverSigners += 1;
+    if (categories.includes("notice")) summary.noticeOrService += 1;
+    if (item.service?.needsAttention || categories.some((key) => ["minor", "address", "notice", "waiver-needed", "suggested"].includes(key))) {
+      summary.serviceAttention += 1;
+    }
+  });
+  return summary;
+}
+
 function renderInterestedPersonsSourceReview() {
   syncInterestedPersonRoster({ addMissing: false });
   const items = interestedPersonSourceReviewItems();
+  const legalSummary = interestedPersonLegalAuditSummary(items);
   const stats = {
     included: items.filter((item) => item.status === "included").length,
     suggested: items.filter((item) => item.status === "suggested").length,
@@ -3643,6 +4052,10 @@ function renderInterestedPersonsSourceReview() {
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
+    <div class="service-focus-card">
+      <h3>Interested-person legal audit</h3>
+      <p>This software checklist explains why each person/entity is included, suggested, or excluded, and how the current answers affect waiver, notice, service, minor/protected-person, trust, and address treatment.</p>
+    </div>
     <div class="audit-stat-grid">
       <div class="contact-stat">
         <span>${stats.included}</span>
@@ -3660,6 +4073,14 @@ function renderInterestedPersonsSourceReview() {
         <span>${stats.attention}</span>
         <p>Need service review</p>
       </div>
+    </div>
+    <div class="legal-audit-summary-grid">
+      <div><strong>${legalSummary.heirs}</strong><span>heir/heirship</span></div>
+      <div><strong>${legalSummary.willBeneficiaries}</strong><span>beneficiary</span></div>
+      <div><strong>${legalSummary.fiduciaries}</strong><span>fiduciary</span></div>
+      <div class="${legalSummary.trustRoles ? "warn" : ""}"><strong>${legalSummary.trustRoles}</strong><span>trust roles</span></div>
+      <div class="${legalSummary.minorProtected ? "warn" : ""}"><strong>${legalSummary.minorProtected}</strong><span>minor/protected</span></div>
+      <div class="${legalSummary.noticeOrService ? "warn" : ""}"><strong>${legalSummary.noticeOrService}</strong><span>notice/service</span></div>
     </div>
     <div class="guided-toolbar">
       <span class="badge">${items.length} audited</span>
@@ -3708,6 +4129,7 @@ function sourceReviewCardHtml(item, auditIndex) {
   const serviceBadges = item.current && item.service ? serviceStatusBadgesHtml(item.service.person) : "";
   const reasonChips = item.reasons.length ? item.reasons : ["No source reason available"];
   const sourceChips = item.sources?.length ? item.sources : splitSourceParts(item.source || "");
+  const auditRows = interestedPersonLegalAuditRows(item);
   const open = item.status === "suggested" || item.service?.needsAttention;
   return `
     <details class="source-review-card ${escapeAttr(item.status)} ${escapeAttr(item.tone || "")}" ${open ? "open" : ""}>
@@ -3726,6 +4148,14 @@ function sourceReviewCardHtml(item, auditIndex) {
         <div class="audit-decision">
           <strong>${escapeHtml(item.decision)}</strong>
           <span>${escapeHtml(item.action)}</span>
+        </div>
+        <div class="legal-audit-card-grid">
+          ${auditRows.map((row) => `
+            <div class="legal-audit-card-row ${escapeAttr(row.tone)}">
+              <strong>${escapeHtml(row.label)}</strong>
+              <span>${escapeHtml(row.detail)}</span>
+            </div>
+          `).join("")}
         </div>
         <div class="source-chip-list">
           ${reasonChips.map((reason) => `<span class="source-chip">${escapeHtml(reason)}</span>`).join("")}
@@ -3759,15 +4189,202 @@ function addressContactReviewMessage() {
   return "";
 }
 
+function preparerLooksBlank() {
+  return ![state.preparer.fullName, state.preparer.address, state.preparer.email, state.preparer.phone, state.preparer.barNumber].some(hasValue);
+}
+
+function defaultPreparerToApplicant() {
+  if (!preparerLooksBlank() || !hasValue(state.applicant.fullName)) return;
+  state.preparer.fullName = state.applicant.fullName;
+  state.preparer.address = state.applicant.address;
+  state.preparer.email = state.applicant.email;
+  state.preparer.phone = state.applicant.phone;
+  state.preparer.barNumber = state.applicant.barNumber;
+  saveState();
+}
+
+function guidedPreparerComplete() {
+  return hasValue(state.preparer.fullName) && hasValue(state.preparer.address);
+}
+
+function guidedPreparerMessage() {
+  if (!hasValue(state.preparer.fullName)) return "Add the name of the person completing the forms.";
+  if (!hasValue(state.preparer.address)) return "Add the preparer's mailing address.";
+  return "";
+}
+
+function guidedPersonMatch(saved = {}, source = {}, options = {}) {
+  const savedName = saved.name || saved.fullName || "";
+  const sourceName = source.name || source.fullName || "";
+  if (!hasValue(savedName) || !hasValue(sourceName) || !sameName(savedName, sourceName)) return false;
+  if (hasValue(source.address) && comparableText(saved.address) !== comparableText(source.address)) return false;
+  if (options.relationship) {
+    const allowed = Array.isArray(options.relationship) ? options.relationship : [options.relationship];
+    return allowed.some((relationship) => comparableText(saved.relationship) === comparableText(relationship));
+  }
+  return true;
+}
+
+function renderGuidedPreparer() {
+  defaultPreparerToApplicant();
+  const applicantSelected = guidedPersonMatch(state.preparer, state.applicant);
+  const prSelected = guidedPersonMatch(state.preparer, state.pr);
+  const wrapper = document.createElement("div");
+  wrapper.className = "guided-repeat";
+  wrapper.innerHTML = `
+    <div class="guided-person-card">
+      <h3>Who is completing the forms?</h3>
+      <p>This is the person shown in the "form completed by" area on the court forms. For most public users, this will be the applicant.</p>
+      <div class="choice-grid role-choice-grid">
+        <button type="button" class="choice-button ${applicantSelected ? "selected" : ""}" aria-pressed="${applicantSelected ? "true" : "false"}" data-use-applicant-preparer>
+          <strong>Use applicant</strong>
+          <span>${escapeHtml(state.applicant.fullName || "Applicant details will be copied here.")}</span>
+        </button>
+        <button type="button" class="choice-button ${prSelected ? "selected" : ""}" aria-pressed="${prSelected ? "true" : "false"}" data-use-pr-preparer ${hasValue(state.pr.fullName) ? "" : "disabled"}>
+          <strong>Use proposed PR</strong>
+          <span>${escapeHtml(state.pr.fullName || "Enter the proposed PR first.")}</span>
+        </button>
+      </div>
+    </div>
+    <div class="guided-person-card">
+      <div class="grid two compact">
+        <label>Name
+          <input data-guided-path="preparer.fullName" value="${escapeAttr(state.preparer.fullName)}" />
+        </label>
+        <label>Mailing address
+          <input data-guided-path="preparer.address" value="${escapeAttr(state.preparer.address)}" />
+        </label>
+        <label>Email
+          <input type="email" data-guided-path="preparer.email" value="${escapeAttr(state.preparer.email)}" />
+        </label>
+        <label>Phone
+          <input type="tel" data-guided-path="preparer.phone" value="${escapeAttr(state.preparer.phone)}" />
+        </label>
+        <label>Attorney State Bar number (if attorney)
+          <input data-guided-path="preparer.barNumber" value="${escapeAttr(state.preparer.barNumber)}" />
+        </label>
+      </div>
+    </div>
+  `;
+  bindGuidedPathInputs(wrapper);
+  wrapper.querySelector("[data-use-applicant-preparer]")?.addEventListener("click", () => {
+    copyApplicantToPreparer();
+    renderInterview();
+  });
+  wrapper.querySelector("[data-use-pr-preparer]")?.addEventListener("click", () => {
+    copyPrToPreparer();
+    renderInterview();
+  });
+  return wrapper;
+}
+
+function heirshipInformantLooksBlank() {
+  const informant = state.heirship?.informant || {};
+  return ![informant.name, informant.address, informant.relationship].some(hasValue);
+}
+
+function copyApplicantToHeirshipInformant() {
+  state.heirship.informant.name = state.applicant.fullName;
+  state.heirship.informant.address = state.applicant.address;
+  state.heirship.informant.relationship = state.applicant.capacity || "Applicant";
+  saveState();
+  renderFields();
+  renderReview();
+  renderInterviewStatus();
+}
+
+function copyPrToHeirshipInformant() {
+  state.heirship.informant.name = state.pr.fullName;
+  state.heirship.informant.address = state.pr.address;
+  state.heirship.informant.relationship = "Proposed Personal Representative";
+  saveState();
+  renderFields();
+  renderReview();
+  renderInterviewStatus();
+}
+
+function defaultHeirshipInformantToApplicant() {
+  if (!heirshipInformantLooksBlank() || !hasValue(state.applicant.fullName)) return;
+  state.heirship.informant.name = state.applicant.fullName;
+  state.heirship.informant.address = state.applicant.address;
+  state.heirship.informant.relationship = state.applicant.capacity || "Applicant";
+  saveState();
+}
+
+function guidedHeirshipInformantComplete() {
+  return hasValue(state.heirship.informant.name)
+    && hasValue(state.heirship.informant.address)
+    && hasValue(state.heirship.informant.relationship);
+}
+
+function guidedHeirshipInformantMessage() {
+  if (!hasValue(state.heirship.informant.name)) return "Choose or enter the person who will sign the Proof of Heirship.";
+  if (!hasValue(state.heirship.informant.address)) return "Add the heirship informant's mailing address.";
+  if (!hasValue(state.heirship.informant.relationship)) return "Add the heirship informant's relationship to the decedent.";
+  return "";
+}
+
+function renderGuidedHeirshipInformant() {
+  defaultHeirshipInformantToApplicant();
+  const applicantRelationship = state.applicant.capacity || "Applicant";
+  const applicantSelected = guidedPersonMatch(state.heirship.informant, state.applicant, { relationship: [applicantRelationship, "Applicant"] });
+  const prSelected = guidedPersonMatch(state.heirship.informant, state.pr, { relationship: "Proposed Personal Representative" });
+  const wrapper = document.createElement("div");
+  wrapper.className = "guided-repeat";
+  wrapper.innerHTML = `
+    <div class="guided-person-card">
+      <h3>Who can answer the family-tree questions?</h3>
+      <p>This person signs PR-1806 Proof of Heirship. It is usually the applicant or proposed personal representative if they know the family facts.</p>
+      <div class="choice-grid role-choice-grid">
+        <button type="button" class="choice-button ${applicantSelected ? "selected" : ""}" aria-pressed="${applicantSelected ? "true" : "false"}" data-use-applicant-informant>
+          <strong>Use applicant</strong>
+          <span>${escapeHtml(state.applicant.fullName || "Applicant details will be copied here.")}</span>
+        </button>
+        <button type="button" class="choice-button ${prSelected ? "selected" : ""}" aria-pressed="${prSelected ? "true" : "false"}" data-use-pr-informant ${hasValue(state.pr.fullName) ? "" : "disabled"}>
+          <strong>Use proposed PR</strong>
+          <span>${escapeHtml(state.pr.fullName || "Enter the proposed PR first.")}</span>
+        </button>
+      </div>
+    </div>
+    <div class="guided-person-card">
+      ${partyPickerHtml("heirshipInformant")}
+      <div class="grid two compact">
+        <label>Name
+          <input data-guided-path="heirship.informant.name" value="${escapeAttr(state.heirship.informant.name)}" />
+        </label>
+        <label>Relationship to decedent
+          <input data-guided-path="heirship.informant.relationship" value="${escapeAttr(state.heirship.informant.relationship)}" />
+        </label>
+        <label>Mailing address
+          <input data-guided-path="heirship.informant.address" value="${escapeAttr(state.heirship.informant.address)}" />
+        </label>
+      </div>
+    </div>
+  `;
+  bindPartyPickers(wrapper);
+  bindGuidedPathInputs(wrapper);
+  wrapper.querySelector("[data-use-applicant-informant]")?.addEventListener("click", () => {
+    copyApplicantToHeirshipInformant();
+    renderInterview();
+  });
+  wrapper.querySelector("[data-use-pr-informant]")?.addEventListener("click", () => {
+    copyPrToHeirshipInformant();
+    renderInterview();
+  });
+  return wrapper;
+}
+
 function beneficiaryRoleOptionsHtml(role) {
+  const trustRoleSelected = ["trust_beneficiary", "trustee"].includes(role);
+  const allowTrustRoles = willCreatesTestamentaryTrust() || trustRoleSelected;
   return [
     ["beneficiary", "Will beneficiary"],
     ["codicil_beneficiary", "Codicil beneficiary"],
-    ["trust_beneficiary", "Trust beneficiary"],
-    ["trustee", "Trustee"],
+    allowTrustRoles ? ["trust_beneficiary", "Trust beneficiary under will-created trust"] : null,
+    allowTrustRoles ? ["trustee", "Trustee under will-created trust"] : null,
     ["entity", "Organization or charity"],
     ["other", "Other person named in will"]
-  ].map(([value, label]) => `<option value="${value}" ${role === value ? "selected" : ""}>${label}</option>`).join("");
+  ].filter(Boolean).map(([value, label]) => `<option value="${value}" ${role === value ? "selected" : ""}>${label}</option>`).join("");
 }
 
 const willRoleConfigs = [
@@ -3779,32 +4396,51 @@ const willRoleConfigs = [
     placeholder: "Name of person named as PR"
   },
   {
-    title: "Trustee named in will",
+    title: "Trustee named for the trust created by the will",
     field: "namedTrustee",
     noneField: "namedTrusteeNone",
     target: "willNamedTrustee",
-    placeholder: "Name of trustee, if any"
+    placeholder: "Name of trustee, if any",
+    trustOnly: true
   },
   {
-    title: "Nominated trustee",
+    title: "Nominated trustee for the trust created by the will",
     field: "nominatedTrustee",
     noneField: "nominatedTrusteeNone",
     target: "willNominatedTrustee",
-    placeholder: "Name of nominated trustee, if any"
+    placeholder: "Name of nominated trustee, if any",
+    trustOnly: true
   }
 ];
 
 function renderGuidedWillRoles() {
+  const trustApplies = willCreatesTestamentaryTrust();
+  const visibleRoles = willRoleConfigs.filter((config) => !config.trustOnly || trustApplies);
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
     <div class="guided-note">
       <p>At this stage, collect names only. Asset values, exact bequest amounts, and distribution details can wait for inventory and estate accounting.</p>
     </div>
+    <div class="guided-person-card">
+      <h3>Does the will create a trust that continues after death?</h3>
+      <p>Answer Yes only for a trust created by the will itself. Do not enter a trustee of a separate revocable living trust here unless the will also creates or names that trust role for this probate case.</p>
+      <div class="choice-grid stacked-choice-grid">
+        ${guidedChoiceButtonHtml("will.createsTestamentaryTrust", "no", "No", "Skip trustee questions for the will-created trust.")}
+        ${guidedChoiceButtonHtml("will.createsTestamentaryTrust", "yes", "Yes", "Ask for trustee names connected to the will-created trust.")}
+        ${guidedChoiceButtonHtml("will.createsTestamentaryTrust", "unknown", "Not sure", "Flag for review before relying on trustee-related forms.")}
+      </div>
+    </div>
+    ${state.will.createsTestamentaryTrust === "unknown" ? `
+      <div class="guided-note warn">
+        <p>Review the will language before using trustee fields. Trust questions can affect interested persons and proposed court orders.</p>
+      </div>
+    ` : ""}
     <div class="guided-card-list">
-      ${willRoleConfigs.map(willRoleCardHtml).join("")}
+      ${visibleRoles.map(willRoleCardHtml).join("")}
     </div>
   `;
+  bindGuidedChoiceButtons(wrapper);
   bindGuidedPathInputs(wrapper);
   wrapper.querySelectorAll("[data-will-role-picker]").forEach((select) => {
     select.addEventListener("change", () => {
@@ -3897,9 +4533,12 @@ function renderGuidedWillBeneficiaries() {
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   const namedCount = state.willBeneficiaries.filter(hasWillBeneficiaryContent).length;
+  const beneficiaryQuestion = willCreatesTestamentaryTrust()
+    ? "Does the will or codicil name beneficiaries, trust beneficiaries, or organizations?"
+    : "Does the will or codicil name beneficiaries or organizations?";
   wrapper.innerHTML = `
     <div class="guided-person-card">
-      <h3>Does the will or codicil name beneficiaries, trust beneficiaries, or organizations?</h3>
+      <h3>${escapeHtml(beneficiaryQuestion)}</h3>
       <p>For the opening packet, enter names and mailing addresses only. Asset values, account numbers, and specific distribution details come later with inventory and estate accounting.</p>
       <div class="choice-grid stacked-choice-grid">
         ${guidedChoiceButtonHtml("will.hasNamedBeneficiaries", "yes", "Yes", "Add the named people or entities for notice/waiver purposes.")}
@@ -3910,7 +4549,7 @@ function renderGuidedWillBeneficiaries() {
     ${state.will.hasNamedBeneficiaries === "yes" ? `
     <div class="guided-toolbar">
       <span class="badge">${namedCount} named</span>
-      <button type="button" class="secondary" data-add-guided-beneficiary>Add beneficiary or trustee</button>
+      <button type="button" class="secondary prominent-add" data-add-guided-beneficiary>Add another named beneficiary or party</button>
     </div>
     <div class="guided-card-list">
       ${state.willBeneficiaries.map((person, index) => {
@@ -3956,7 +4595,7 @@ function renderGuidedWillBeneficiaries() {
       }).join("")}
     </div>
     <div class="list-bottom-actions">
-      <button type="button" class="secondary" data-add-guided-beneficiary-bottom>Add beneficiary or trustee</button>
+      <button type="button" class="secondary prominent-add" data-add-guided-beneficiary-bottom>Add another named beneficiary or party</button>
     </div>
     ` : state.will.hasNamedBeneficiaries === "no" ? `
       <div class="guided-note">
@@ -4004,11 +4643,16 @@ function renderGuidedChildren() {
         ${state.heirship.children.people.map((child, index) => guidedChildCardHtml(normalizeHeirshipChild(child), index)).join("")}
       </div>
       <div class="list-bottom-actions">
-        <button type="button" class="secondary" data-add-guided-child>Add child</button>
+        <button type="button" class="secondary prominent-add" data-add-guided-child>Add another child</button>
       </div>
-      <label class="interview-label">Descendants of deceased children
-        <textarea rows="3" data-guided-path="heirship.children.deceasedChildDescendants">${escapeHtml(state.heirship.children.deceasedChildDescendants)}</textarea>
-      </label>
+      ${deceasedHeirshipChildren(state).length ? `
+        <p class="question-helper">For each deceased child, list that child's living children or later descendants. These descendants may need to be carried into interested-person, waiver, and notice handling.</p>
+      ` : ""}
+      ${hasValue(state.heirship.children.deceasedChildDescendants) ? `
+        <label class="interview-label">Additional deceased-child descendant details
+          <textarea rows="3" data-guided-path="heirship.children.deceasedChildDescendants" placeholder="Example: Deceased child name - descendant name, mailing address if known">${escapeHtml(state.heirship.children.deceasedChildDescendants)}</textarea>
+        </label>
+      ` : ""}
     ` : ""}
   `;
   bindGuidedChoiceButtons(wrapper);
@@ -4072,11 +4716,19 @@ function guidedChildCardHtml(child, index) {
           <label>Mailing address
             <input data-guided-path="heirship.children.people.${index}.address" value="${escapeAttr(child.address)}" />
           </label>
-          <label>Minor date of birth
-            <input type="date" data-guided-path="heirship.children.people.${index}.minorDateOfBirth" value="${escapeAttr(child.minorDateOfBirth)}" />
-          </label>
-          <label>Notes
-            <input data-guided-path="heirship.children.people.${index}.notes" value="${escapeAttr(child.notes)}" placeholder="Adopted, deceased date, descendants, or follow-up" />
+          ${child.livingStatus === "deceased" ? `
+            <label>Date of death, if known
+              <input type="date" data-guided-path="heirship.children.people.${index}.deceasedDate" value="${escapeAttr(child.deceasedDate)}" />
+            </label>
+          ` : ""}
+          ${child.livingStatus === "deceased" ? `
+            <label>Living children or descendants of this deceased child
+              <span class="field-hint">Enter each living grandchild or later descendant who may receive the deceased child's share. Use semicolons or one per line. If there are none, type none.</span>
+              <textarea rows="3" data-guided-path="heirship.children.people.${index}.descendants" placeholder="Grandchild name, mailing address if known; another grandchild, mailing address if known">${escapeHtml(child.descendants)}</textarea>
+            </label>
+          ` : ""}
+          <label>${child.livingStatus === "deceased" ? "Descendants or deceased-date notes" : "Notes"}
+            <input data-guided-path="heirship.children.people.${index}.notes" value="${escapeAttr(child.notes)}" placeholder="${child.livingStatus === "deceased" ? "Names/addresses of descendants, date of death if known" : "Adopted, minor, address follow-up, or other note"}" />
           </label>
         </div>
       </div>
@@ -4107,6 +4759,10 @@ function renderGuidedInterestedSuggestions() {
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
+    <div class="service-focus-card">
+      <h3>Select interested persons for this probate.</h3>
+      <p>Add each suggested person who should receive notice or sign a waiver. You can also add someone manually if the app did not suggest them.</p>
+    </div>
     <div class="contact-status-grid">
       <div class="contact-stat">
         <span>${suggestions.length}</span>
@@ -4123,9 +4779,9 @@ function renderGuidedInterestedSuggestions() {
     </div>
     <div class="guided-toolbar">
       <span class="badge">${suggestions.length} found</span>
-      <button type="button" class="secondary" data-sync-guided-interested>Sync roster and service flags</button>
-      <button type="button" class="secondary" data-add-all-guided-suggestions ${missingSuggestions.length ? "" : "disabled"}>Add all suggestions</button>
-      <button type="button" class="secondary" data-add-guided-person>Add person manually</button>
+      <button type="button" class="secondary" data-sync-guided-interested>Refresh suggestions</button>
+      <button type="button" class="secondary prominent-add" data-add-all-guided-suggestions ${missingSuggestions.length ? "" : "disabled"}>Add all suggested interested persons</button>
+      <button type="button" class="secondary prominent-add" data-add-guided-person>Add another interested person</button>
     </div>
     <div class="guided-suggestions">
       ${suggestions.length ? suggestions.map((suggestion, index) => {
@@ -4139,7 +4795,7 @@ function renderGuidedInterestedSuggestions() {
             </div>
             <div class="suggestion-actions">
               <span class="badge ${existingIndex >= 0 ? "" : "warn"}">${existingIndex >= 0 ? "Added" : suggestion.source || "Suggested"}</span>
-              <button type="button" class="secondary" data-add-guided-suggestion="${index}" ${existingIndex >= 0 ? "disabled" : ""}>${existingIndex >= 0 ? "Added" : "Add"}</button>
+              <button type="button" class="secondary" data-add-guided-suggestion="${index}" ${existingIndex >= 0 ? "disabled" : ""}>${existingIndex >= 0 ? "Added" : "Add this interested person"}</button>
             </div>
           </div>
         `;
@@ -4193,7 +4849,7 @@ function renderGuidedInterestedPersonDetails() {
   wrapper.innerHTML = `
     <div class="guided-toolbar">
       <span class="badge">${completedCount} listed${draftCount ? `, ${draftCount} new` : ""}</span>
-      <button type="button" class="secondary" data-add-guided-person>Add person</button>
+      <button type="button" class="secondary prominent-add" data-add-guided-person>Add another interested person</button>
     </div>
     <div class="guided-card-list">
       ${visiblePeople.length
@@ -4201,7 +4857,7 @@ function renderGuidedInterestedPersonDetails() {
         : `<div class="suggestion-empty">No interested persons have been added yet. Use Add person or the suggested roster screen to add heirs, beneficiaries, trustees, or other required people.</div>`}
     </div>
     <div class="list-bottom-actions">
-      <button type="button" class="secondary" data-add-guided-person-bottom>Add person</button>
+      <button type="button" class="secondary prominent-add" data-add-guided-person-bottom>Add another interested person</button>
     </div>
   `;
   bindPartyPickers(wrapper);
@@ -4221,15 +4877,19 @@ function renderGuidedInterestedService() {
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
     <div class="service-focus-card">
-      <h3>Choose a waiver answer for each person.</h3>
-      <p>Use "can sign" only when the person is an adult, located, and willing to sign. Anything else may require mailed notice or PR-1805 review.</p>
+      <h3>Choose waiver or notice treatment for each person.</h3>
+      <p>PR-1803 is the waiver and consent form. Mark "will sign waiver" only when the person is an adult, located, and expected to sign. Anything else may require mailed notice or PR-1805 review.</p>
     </div>
+    <details class="compact-help service-summary-details">
+      <summary>Who usually counts as an interested person?</summary>
+      <p>Common examples include heirs, people named in a will or codicil, a nominated personal representative, trustees or trust beneficiaries connected to the estate plan, and anyone who needs a guardian, agent, or special notice review. Close calls should be reviewed before filing.</p>
+    </details>
     <details class="compact-help service-summary-details">
       <summary>Waiver status summary</summary>
       <div class="packet-stat-grid compact-stat-grid">
         <div class="packet-stat">
           <strong>${summary.canSignWaiverCount}/${summary.total}</strong>
-          <span>can sign waiver</span>
+          <span>will sign waiver</span>
         </div>
         <div class="packet-stat">
           <strong>${summary.mailedNoticeCount}</strong>
@@ -4252,7 +4912,7 @@ function renderGuidedInterestedService() {
     <div class="guided-toolbar">
       <span class="badge">${summary.unansweredWaiverCount} unanswered</span>
       <button type="button" class="secondary" data-sync-service-treatment>Sync service treatment</button>
-      <button type="button" class="secondary" data-mark-eligible-waivers ${summary.total ? "" : "disabled"}>Mark eligible known adults can sign</button>
+      <button type="button" class="secondary" data-mark-eligible-waivers ${summary.total ? "" : "disabled"}>Mark eligible known adults as willing to sign</button>
     </div>
     <div class="guided-card-list">
       ${people.length ? state.interestedPersons.map((person, index) => hasInterestedPersonContent(person) ? guidedInterestedServiceCardHtml(normalizeInterestedPerson(person), index) : "").join("") : `
@@ -4637,6 +5297,11 @@ function bindGuidedPathInputs(root) {
         syncHeirshipChildrenList();
         renderHeirshipChildren();
         renderInterestedSuggestions();
+        if (path.endsWith(".livingStatus")) {
+          renderReview();
+          renderInterview();
+          return;
+        }
       }
       if (path.startsWith("inventory.")) {
         renderInventoryItems();
@@ -5018,19 +5683,19 @@ function renderCountyCourtSetup() {
         <label>Courthouse address
           <input data-guided-path="countyDefaults.courthouseAddress" value="${escapeAttr(state.countyDefaults.courthouseAddress)}" placeholder="Street, city, state, zip" />
         </label>
-        <label>Room or branch
+        <label>Room or branch, if known
           <input data-guided-path="countyDefaults.room" value="${escapeAttr(state.countyDefaults.room)}" />
         </label>
         <label>Probate office
           <input data-guided-path="countyDefaults.probateOfficeName" value="${escapeAttr(state.countyDefaults.probateOfficeName)}" placeholder="Probate Division" />
         </label>
-        <label>Probate registrar
+        <label>Probate registrar, if known
           <input data-guided-path="countyDefaults.registrarName" value="${escapeAttr(state.countyDefaults.registrarName)}" />
         </label>
         <label>Publication newspaper
           <input data-guided-path="countyDefaults.newspaperName" value="${escapeAttr(state.countyDefaults.newspaperName)}" />
         </label>
-        <label>Accommodation phone
+        <label>Accommodation phone, if known
           <input data-guided-path="countyDefaults.accommodationPhone" value="${escapeAttr(state.countyDefaults.accommodationPhone)}" />
         </label>
         <label>Local notes
@@ -5058,7 +5723,7 @@ function renderCountyCourtSetup() {
 
 function openingPathInterviewComplete() {
   const serviceSummary = interestedPersonServiceSummary();
-  const hasPersonPathAnswers = serviceSummary.total > 0 && serviceSummary.unansweredWaiverCount === 0;
+  const hasPersonPathAnswers = serviceSummary.total > 0 && serviceSummary.rawUnansweredWaiverCount === 0;
   if (!hasValue(state.opening.waiverStatus) && !hasPersonPathAnswers) return false;
   if (!hasValue(state.opening.unknownInterestedPersonsStatus) && !hasPersonPathAnswers) return false;
   if (openingPathDecision().key === "unknown") return false;
@@ -5069,8 +5734,8 @@ function openingPathInterviewComplete() {
 
 function openingPathInterviewMessage() {
   const serviceSummary = interestedPersonServiceSummary();
-  const hasPersonPathAnswers = serviceSummary.total > 0 && serviceSummary.unansweredWaiverCount === 0;
-  if (!hasValue(state.opening.waiverStatus) && !hasPersonPathAnswers) return "Answer each person's waiver status, or choose whether everyone can sign a waiver.";
+  const hasPersonPathAnswers = serviceSummary.total > 0 && serviceSummary.rawUnansweredWaiverCount === 0;
+  if (!hasValue(state.opening.waiverStatus) && !hasPersonPathAnswers) return "Answer each person's waiver status, or choose whether everyone will sign a waiver.";
   if (!hasValue(state.opening.unknownInterestedPersonsStatus) && !hasPersonPathAnswers) return "Answer whether anyone is unknown or cannot be located.";
   if (state.opening.waiverStatus === "not_all" && !hasValue(state.opening.noticeReason)) return "Choose why the case cannot open entirely on waivers.";
   if (state.opening.unknownInterestedPersonsStatus === "some_unknown" && !hasValue(state.notice1805.unknownInterestedPersons)) return "Describe the unknown or not-located interested persons.";
@@ -5158,7 +5823,7 @@ function openingPacketFormDetails(data = state) {
     name: "Waiver and Consent",
     status: isWaiver ? "included" : pathPending ? "pending" : "not-in-path",
     reason: isWaiver
-      ? `${serviceSummary.canSignWaiverCount || "All"} interested person(s) can sign waivers, so the case can open without a PR-1805 hearing notice. Waiver mode: ${waiverSignatureModeLabel(data.waiver?.signatureMode)}.`
+      ? `${serviceSummary.canSignWaiverCount || "All"} interested person(s) are expected to sign waivers, so the case can open without a PR-1805 hearing notice. Waiver mode: ${waiverSignatureModeLabel(data.waiver?.signatureMode)}.`
       : pathPending
         ? "The app needs the waiver/service answers before deciding whether PR-1803 belongs in this packet."
         : "Not included because at least one required waiver is unavailable or the case needs the notice path."
@@ -5221,7 +5886,7 @@ function openingPacketResults(data = state) {
     return {
       tone: "ok",
       title: "Waiver opening packet",
-      summary: "Use this when every required interested person can sign PR-1803 and no person-level service answer points to PR-1805.",
+      summary: "Use this when every required interested person is expected to sign PR-1803 and no person-level service answer points to PR-1805.",
       forms: formDetails.filter((item) => item.status === "included").map(packetFormLabel),
       formDetails,
       serviceSummary,
@@ -5300,7 +5965,7 @@ function packetServiceSummaryHtml(summary) {
     return `<p class="helper-text">No interested persons have been added yet. Add heirs, beneficiaries, trustees, and other required parties so the app can choose the packet more accurately.</p>`;
   }
   const stats = [
-    [`${summary.canSignWaiverCount}/${summary.total}`, "can sign waiver"],
+    [`${summary.canSignWaiverCount}/${summary.total}`, "will sign waiver"],
     [`${summary.mailedNoticeCount}`, "need mailed notice"],
     [`${summary.unknownOrMissingCount}`, "unknown/not located"],
     [`${summary.protectedCount}`, "minor/protected"],
@@ -5668,18 +6333,18 @@ function productInfo(key = "informal_probate") {
     informal_probate: {
       key: "informal_probate",
       title: "Informal Probate Forms Package",
-      price: BETA_UNLOCK_ENABLED ? "$0 beta" : "$499 target launch price",
+      price: CONTROLLED_BETA_MODE ? PLATFORM_LAUNCH_CONFIG.betaPriceLabel : PLATFORM_LAUNCH_CONFIG.targetInformalProbatePrice,
       free: "Start your Wisconsin probate forms for free. Answer simple questions, identify missing information, and review the package price before download.",
-      paid: BETA_UNLOCK_ENABLED
+      paid: CONTROLLED_BETA_MODE
         ? "Beta document packet and filing checklist download for testing and feedback. Target launch price can be turned on later."
         : "Completed Wisconsin informal probate opening forms and filing checklist download."
     },
     transfer_affidavit: {
       key: "transfer_affidavit",
       title: "Transfer by Affidavit Package",
-      price: BETA_UNLOCK_ENABLED ? "$0 beta" : "$149 target launch price",
+      price: CONTROLLED_BETA_MODE ? PLATFORM_LAUNCH_CONFIG.betaPriceLabel : PLATFORM_LAUNCH_CONFIG.targetTransferAffidavitPrice,
       free: "Start free, answer simple questions, identify missing information, and review the package price before download.",
-      paid: BETA_UNLOCK_ENABLED
+      paid: CONTROLLED_BETA_MODE
         ? "Beta affidavit document packet and transfer checklist download for testing and feedback."
         : "Completed Transfer by Affidavit packet and transfer checklist download."
     },
@@ -5703,6 +6368,90 @@ function productInfo(key = "informal_probate") {
 
 function documentProductKey() {
   return "informal_probate";
+}
+
+function launchReleaseGateStatus(productKey = documentProductKey(), data = state) {
+  return withTemporaryState(data, () => {
+    const legalLock = legalLogicLockStatus(data);
+    const output = outputReadinessSummary(formPreviewDefinitions());
+    const integrity = officialFormIntegritySummary(formPreviewDefinitions());
+    const blockers = [];
+    const warnings = [];
+    const betaMode = CONTROLLED_BETA_MODE || PLATFORM_LAUNCH_CONFIG.mode !== "production";
+    if (!betaMode) {
+      if (!PLATFORM_LAUNCH_CONFIG.publicPaidLaunchAllowed) blockers.push("Public paid launch is not enabled in platform configuration.");
+      if (!legalLock.locked) blockers.push("Attorney/legal logic has not been locked for public launch.");
+      if (output.overlayNeeded || output.templateNeeded || integrity.exactOutputNeeded) blockers.push("Exact official PDF/form output still needs production approval.");
+      if (!PLATFORM_FEATURE_FLAGS.hostedAccounts) blockers.push("Hosted accounts and server-side matter storage are not enabled.");
+      if (!PLATFORM_FEATURE_FLAGS.productionPayments) blockers.push("Production payment processing is not enabled.");
+      if (!PLATFORM_FEATURE_FLAGS.secureDocumentDelivery) blockers.push("Secure document delivery is not enabled.");
+    }
+    if (betaMode) warnings.push("Controlled beta mode: $0 downloads are for testing and feedback before public paid launch.");
+    if (!legalLock.locked) warnings.push("Attorney/legal logic checkpoint is not locked yet.");
+    if (output.overlayNeeded || output.templateNeeded || integrity.exactOutputNeeded) warnings.push("Some active forms still need exact official PDF/template output work before paid production.");
+    if (legalLock.severeIssues.length) warnings.push(`${legalLock.severeIssues.length} high-severity beta issue(s) are open.`);
+    if (!PLATFORM_FEATURE_FLAGS.hostedAccounts) warnings.push("Save/resume is local prototype storage, not hosted production accounts.");
+    return {
+      productKey,
+      mode: betaMode ? "controlled_beta" : "production",
+      label: betaMode ? "Controlled beta" : "Production",
+      canUnlock: betaMode || blockers.length === 0,
+      canDownload: betaMode || blockers.length === 0,
+      blockers,
+      warnings,
+      legalLock,
+      output,
+      integrity
+    };
+  });
+}
+
+function launchGateSummaryHtml(productKey = documentProductKey()) {
+  const gate = launchReleaseGateStatus(productKey);
+  const tone = gate.blockers.length ? "bad" : gate.warnings.length ? "warn" : "";
+  return `
+    <details class="launch-gate-summary ${escapeAttr(tone)}">
+      <summary>${escapeHtml(gate.label)} download gate</summary>
+      <div class="launch-gate-body">
+        ${gate.blockers.length ? `
+          <strong>Before production launch</strong>
+          <ul>${gate.blockers.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        ` : ""}
+        ${gate.warnings.length ? `
+          <strong>${gate.mode === "controlled_beta" ? "Beta notes" : "Review notes"}</strong>
+          <ul>${gate.warnings.slice(0, 5).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        ` : `<p>No launch-gate warnings detected.</p>`}
+      </div>
+    </details>
+  `;
+}
+
+function launchReleaseGateText(productKey = documentProductKey(), data = state) {
+  const gate = launchReleaseGateStatus(productKey, data);
+  return [
+    "Launch Gate Report",
+    `Generated: ${documentDate(new Date().toISOString().slice(0, 10))}`,
+    `Product: ${productInfo(productKey).title}`,
+    `Mode: ${gate.label}`,
+    `Download allowed in this mode: ${gate.canDownload ? "Yes" : "No"}`,
+    "",
+    "Production blockers",
+    gate.blockers.length ? gate.blockers.map((item) => `- ${item}`).join("\n") : "- None for the current mode.",
+    "",
+    "Beta/review notes",
+    gate.warnings.length ? gate.warnings.map((item) => `- ${item}`).join("\n") : "- None.",
+    "",
+    "Legal lock snapshot",
+    `Locked: ${gate.legalLock.locked ? "Yes" : "No"}`,
+    `Scenario suite: ${gate.legalLock.scenarioSummary.passCount}/${gate.legalLock.scenarioSummary.total} scenarios passing`,
+    `Attorney beta validation: ${gate.legalLock.attorneyBeta.approved}/${gate.legalLock.attorneyBeta.total} approved`,
+    "",
+    "Official output snapshot",
+    `Active forms: ${gate.output.activeCount}`,
+    `PDF overlays needed: ${gate.output.overlayNeeded}`,
+    `Official templates needed: ${gate.output.templateNeeded}`,
+    `Exact output items still needing work: ${gate.integrity.exactOutputNeeded}`
+  ].join("\n");
 }
 
 function accountEmail() {
@@ -6098,14 +6847,19 @@ function productionLaunchHandoffText(data = state) {
     const legalLock = legalLogicLockStatus(data);
     const attorneyBeta = attorneyBetaReviewSummary(data);
     const integrity = officialFormIntegritySummary(formPreviewDefinitions());
+    const gate = launchReleaseGateStatus(documentProductKey(), data);
     return [
       "Production Launch Handoff",
       `Generated: ${documentDate(new Date().toISOString().slice(0, 10))}`,
       "",
       "Launch gates",
+      `Launch mode: ${gate.label}`,
+      `Public paid launch allowed: ${PLATFORM_LAUNCH_CONFIG.publicPaidLaunchAllowed ? "Yes" : "No"}`,
       `Official form output: ${integrity.exactOutputNeeded ? `${integrity.exactOutputNeeded} active exact-output item(s) still need final approval` : "active outputs reviewed"}`,
       `Attorney beta validation: ${attorneyBeta.approved}/${attorneyBeta.total} approved`,
       `Legal logic lock: ${legalLock.locked ? "locked" : legalLock.ready ? "ready to lock" : "blocked"}`,
+      `Production blockers: ${gate.blockers.length}`,
+      gate.blockers.length ? gate.blockers.map((item) => `- ${item}`).join("\n") : "- No production blockers for the current mode.",
       "",
       "Accounts and storage",
       "- Replace local browser storage with secure server-side accounts.",
@@ -6121,8 +6875,8 @@ function productionLaunchHandoffText(data = state) {
       "",
       "Document output",
       "- Public users usually print, wet-sign, and paper file or mail the opening packet.",
-      "- Attorneys may need both editable Word/DOCX and signed/scanned PDF lanes depending on the eFiling form.",
-      "- PR-1808 and PR-1810 should remain court-editable drafts where local practice or eFiling requires Word/DOCX.",
+      "- Attorney eFiling format rule: PR-1801, PR-1804, PR-1805, and PR-1808 are Word/DOCX; the other opening and later PR forms are PDFs.",
+      "- Signed forms still need wet signatures before paper filing or scanned/flattened PDF handling when they are in the PDF lane.",
       "- Later administration forms such as PR-1811 should live in a later-stage folder after letters issue.",
       "",
       "GitHub/deployment",
@@ -6239,9 +6993,9 @@ function betaKnownLimitationsText(data = state) {
     "Court forms",
     "- Wisconsin PR forms are standard court forms and must not be altered.",
     "- Current beta downloads are DOCX drafts and mapping aids unless marked otherwise.",
-    "- Production output must use official PDFs or exact approved replicas for filing copies.",
-    "- Wet-signed documents generally need to be scanned/flattened to PDF before attorney eFiling.",
-    "- PR-1808 and PR-1810 may need Word/editable format for attorney eFiling or court editing; final per-form rules are still being confirmed.",
+    "- Production output must preserve official form language, layout, and margins in the required Word/DOCX or PDF filing format.",
+    "- Attorney eFiling format rule: PR-1801, PR-1804, PR-1805, and PR-1808 are Word/DOCX; PR-1803, PR-1806, PR-1807, PR-1810, PR-1811, PR-1814, PR-1815, PR-1816, and PR-1817 are PDFs.",
+    "- Wet-signed PDF-lane documents generally need to be scanned/flattened before attorney eFiling.",
     "",
     "County practice",
     "- County courthouse, probate office, registrar, publication newspaper, and local-practice notes must be verified before relying on output.",
@@ -6366,6 +7120,7 @@ async function buildBetaTesterPackageZip(data = state) {
   zip.file("17-secure-delivery-manifest.txt", secureDeliveryManifestText(data));
   zip.file("18-legal-logic-beta-lock.txt", legalLogicLockText(data));
   zip.file("19-production-launch-handoff.txt", productionLaunchHandoffText(data));
+  zip.file("20-launch-gate-report.txt", launchReleaseGateText(documentProductKey(), data));
   return zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
 }
 
@@ -6542,6 +7297,7 @@ function readinessTone(complete, caution = false) {
 
 function betaLaunchReadinessItems() {
   const suite = scenarioSuiteSummary();
+  const batch2 = batch2AttorneyApprovedSummary();
   const output = outputReadinessSummary();
   const integrity = officialFormIntegritySummary();
   return [
@@ -6562,6 +7318,12 @@ function betaLaunchReadinessItems() {
       status: paymentUnlockedFor(state.payment?.productKey || documentProductKey()) || state.payment?.status === "paid" ? "Unlocked in this session" : "Ready to test",
       tone: readinessTone(true, state.payment?.status !== "paid"),
       detail: "Models the future payment gate while keeping the beta free for feedback."
+    },
+    {
+      label: "Final download checkpoint",
+      status: state.payment?.finalDownloadedAt ? `Downloaded ${documentDate(String(state.payment.finalDownloadedAt).slice(0, 10))}` : "Not downloaded yet",
+      tone: readinessTone(Boolean(state.payment?.finalDownloadedAt), true),
+      detail: state.payment?.finalDownloadedAt ? "Download was logged with the matter and feedback prompt." : "A tester should reach download, inspect the ZIP, and submit feedback."
     },
     {
       label: "Feedback capture",
@@ -6586,6 +7348,12 @@ function betaLaunchReadinessItems() {
       status: `${suite.passCount}/${suite.total} scenarios passing`,
       tone: readinessTone(suite.failedChecks === 0),
       detail: `${suite.totalChecks - suite.failedChecks}/${suite.totalChecks} logic checks currently pass.`
+    },
+    {
+      label: "Batch 2 attorney-approved scenarios",
+      status: `${batch2.approved}/${batch2.total} approved`,
+      tone: readinessTone(batch2.total > 0 && batch2.failedChecks === 0 && batch2.failedOutputChecks === 0),
+      detail: `${batch2.outputChecks - batch2.failedOutputChecks}/${batch2.outputChecks} Batch 2 form-output checks pass. Approved ${documentDate(batch2.approvedAt)}.`
     },
     {
       label: "Official output readiness",
@@ -6659,15 +7427,41 @@ function scenarioSuiteSummary() {
   };
 }
 
+function batch2AttorneyApprovedSummary() {
+  const results = (testScenarios || []).map(evaluateTestScenario).filter((result) => /^batch2-/.test(result.scenario.id));
+  const totalChecks = results.reduce((sum, result) => sum + result.checks.length, 0);
+  const failedChecks = results.reduce((sum, result) => sum + result.checks.filter((check) => !check.pass).length, 0);
+  const outputChecks = results.reduce((sum, result) => {
+    return sum + result.checks.filter((check) => /output carries|output includes|checkbox marks|Transfer by Affidavit output/.test(check.label)).length;
+  }, 0);
+  const failedOutputChecks = results.reduce((sum, result) => {
+    return sum + result.checks.filter((check) => !check.pass && /output carries|output includes|checkbox marks|Transfer by Affidavit output/.test(check.label)).length;
+  }, 0);
+  return {
+    total: results.length,
+    approved: results.length,
+    passCount: results.filter((result) => result.pass).length,
+    totalChecks,
+    failedChecks,
+    outputChecks,
+    failedOutputChecks,
+    approvedAt: "2026-06-11",
+    reviewer: "Attorney review from Batch 2 worksheet"
+  };
+}
+
 function scenarioSuiteSummaryText() {
   const results = (testScenarios || []).map(evaluateTestScenario);
   const summary = scenarioSuiteSummary();
+  const batch2 = batch2AttorneyApprovedSummary();
   return [
     "Formal Test Scenario Suite",
     `Generated: ${documentDate(new Date().toISOString().slice(0, 10))}`,
     "",
     `Scenarios passing: ${summary.passCount}/${summary.total}`,
     `Checks passing: ${summary.totalChecks - summary.failedChecks}/${summary.totalChecks}`,
+    `Batch 2 attorney-approved scenarios: ${batch2.approved}/${batch2.total}`,
+    `Batch 2 form-output checks passing: ${batch2.outputChecks - batch2.failedOutputChecks}/${batch2.outputChecks}`,
     "",
     ...results.map((result) => [
       `${result.pass ? "[PASS]" : "[FAIL]"} ${result.scenario.id}`,
@@ -6710,7 +7504,7 @@ function probateLogicAuditItems() {
     },
     {
       label: "Waiver/service treatment",
-      status: `${serviceSummary.canSignWaiverCount}/${serviceSummary.total} can sign waiver`,
+      status: `${serviceSummary.canSignWaiverCount}/${serviceSummary.total} will sign waiver`,
       tone: serviceSummary.total && serviceSummary.unansweredWaiverCount === 0 ? serviceSummary.requiresNotice ? "warn" : "ok" : "bad",
       detail: `${serviceSummary.unansweredWaiverCount} unanswered, ${serviceSummary.unknownOrMissingCount} unknown/not located, ${serviceSummary.protectedCount} minor/protected, ${serviceSummary.missingAddressCount} address issue(s).`
     },
@@ -6791,7 +7585,7 @@ function logicDecisionTraceItems() {
   return [
     ["Probate route", route.title, route.detail],
     ["Opening path", decision.title, decision.detail],
-    ["Waiver capacity", `${service.canSignWaiverCount}/${service.total} can sign`, `${service.unansweredWaiverCount} unanswered; ${service.requiresNotice ? "notice/service issue exists" : "no service issue requires PR-1805 from current answers"}.`],
+    ["Waiver status", `${service.canSignWaiverCount}/${service.total} expected to sign`, `${service.unansweredWaiverCount} unanswered; ${service.requiresNotice ? "notice/service issue exists" : "no service issue requires PR-1805 from current answers"}.`],
     ["Unknown/missing parties", String(service.unknownOrMissingCount), service.unknownOrMissingCount ? "One or more people are unknown, missing, or cannot be located." : "No unknown/missing party is flagged."],
     ["Minor/protected-person review", String(service.protectedCount), service.protectedCount ? "Minor/protected-person status may prevent waiver treatment." : "No minor/protected person is flagged in service treatment."],
     ["Packet readiness", readiness.ready ? "Ready" : "Needs info", readiness.blockers[0] || "No must-fix opening packet blockers."]
@@ -7584,11 +8378,13 @@ function hostedBetaLaunchConsoleHtml() {
   const signatureSummary = signatureTrackingSummary();
   const legalLock = legalLogicLockStatus();
   const attorneyBeta = attorneyBetaReviewSummary();
+  const batch2 = batch2AttorneyApprovedSummary();
   const blockers = issues.filter((issue) => issue.severity === "launch_blocker" || issue.severity === "high").length;
   const rows = [
     ["Saved accounts", PLATFORM_FEATURE_FLAGS.hostedAccounts ? "Backend enabled" : "Prototype local only", PLATFORM_FEATURE_FLAGS.hostedAccounts ? "" : "warn"],
     ["Secure links", `${links.length} prototype link(s)`, links.length ? "" : "warn"],
     ["Beta issues", `${issues.length} captured`, blockers ? "bad" : issues.length ? "" : "warn"],
+    ["Batch 2 approval", `${batch2.approved}/${batch2.total} approved`, batch2.failedChecks || batch2.failedOutputChecks ? "bad" : ""],
     ["Attorney beta cases", `${attorneyBeta.approved}/${attorneyBeta.total} approved`, attorneyBeta.ready ? "" : attorneyBeta.needsRevision ? "bad" : "warn"],
     ["Signature workflow", `${signatureSummary.signed}/${signatureSummary.required} signed`, signatureSummary.pending ? "warn" : ""],
     ["Scenario suite", `${scenarioSuiteSummary().passCount}/${scenarioSuiteSummary().total} passing`, scenarioSuiteSummary().failedChecks ? "bad" : ""],
@@ -7609,7 +8405,7 @@ function hostedBetaLaunchConsoleHtml() {
           <div class="admin-readiness-row ${escapeAttr(tone)}">
             <strong>${escapeHtml(label)}</strong>
             <span>${escapeHtml(value)}</span>
-            <p>${escapeHtml(label === "Saved accounts" ? "Production needs server-side login, ownership, encryption, and recovery." : label === "Secure links" ? "Production links need authentication, expiration, revocation, and download audit." : label === "Beta issues" ? "High severity feedback should block launch until resolved or waived." : label === "Attorney beta cases" ? "Hard probate fact patterns should be reviewed before public launch." : label === "Signature workflow" ? "Documents needing signatures must be tracked before final filing/eFiling." : label === "Legal logic lock" ? "Public beta should wait until attorney-reviewed logic is locked against passing scenario tests." : "Scenario failures should block launch.")}</p>
+            <p>${escapeHtml(label === "Saved accounts" ? "Production needs server-side login, ownership, encryption, and recovery." : label === "Secure links" ? "Production links need authentication, expiration, revocation, and download audit." : label === "Beta issues" ? "High severity feedback should block launch until resolved or waived." : label === "Batch 2 approval" ? "The 12 supplied real-world Batch 2 scenarios are attorney-approved and now include automated form-output checks." : label === "Attorney beta cases" ? "Hard probate fact patterns should be reviewed before public launch." : label === "Signature workflow" ? "Documents needing signatures must be tracked before final filing/eFiling." : label === "Legal logic lock" ? "Public beta should wait until attorney-reviewed logic is locked against passing scenario tests." : "Scenario failures should block launch.")}</p>
           </div>
         `).join("")}
       </div>
@@ -7798,11 +8594,13 @@ function paymentGateRouteWarningHtml(productKey = documentProductKey()) {
   return "";
 }
 
+const USER_AGREEMENT_ACKNOWLEDGMENT = "I agree that this service provides document automation and general legal information, not legal advice or legal representation. I am responsible for reviewing the forms before filing, confirming county requirements, and deciding whether to consult a Wisconsin attorney. To the extent permitted by law, any liability is limited to the amount actually paid for this software service.";
+
 function paymentGateHtml(context = "forms", productKey = documentProductKey()) {
   const info = productInfo(productKey);
   const unlocked = paymentUnlockedFor(info.key);
   const label = context === "filing" || context === "opening" ? "final opening packet" : "final forms";
-  const betaMode = BETA_UNLOCK_ENABLED && info.price === "$0 beta";
+  const betaMode = CONTROLLED_BETA_MODE && info.price === PLATFORM_LAUNCH_CONFIG.betaPriceLabel;
   const nextStep = context === "opening" ? "opening-filing-instructions" : "";
   return `
     <div class="payment-gate ${unlocked ? "ready" : "locked"} ${betaMode && !unlocked ? "beta" : ""}" ${nextStep ? `data-payment-next-step="${escapeAttr(nextStep)}"` : ""}>
@@ -7815,6 +8613,7 @@ function paymentGateHtml(context = "forms", productKey = documentProductKey()) {
             ? `Unlock the ${label} download for $0 during beta. This models the future payment step while we collect testing feedback.`
             : `Review the forms included, missing items, and attorney-review warnings before purchase. After payment, you can download your completed document packet and filing checklist.`)}</p>
         ${paymentGateRouteWarningHtml(info.key)}
+        ${launchGateSummaryHtml(info.key)}
         ${legalDisclaimerHtml("checkout")}
       </div>
       <div class="payment-gate-panel">
@@ -7836,8 +8635,12 @@ function paymentGateHtml(context = "forms", productKey = documentProductKey()) {
           </select>
           <label class="inline-check">
             <input type="checkbox" data-payment-terms ${state.payment.agreedToTerms ? "checked" : ""} />
-            <span>I understand that this service provides document automation and legal information, not legal advice. I understand that court or county staff may request additional information, forms, or steps depending on the facts of the estate.</span>
+            <span>${escapeHtml(USER_AGREEMENT_ACKNOWLEDGMENT)}</span>
           </label>
+          <details class="compact-help payment-terms-note">
+            <summary>User agreement note</summary>
+            <p>This is a prototype acknowledgement. Before public launch, the full terms, privacy policy, refund policy, liability language, and support scope should be reviewed and approved by Wisconsin counsel.</p>
+          </details>
           <button type="button" class="primary full-width" data-payment-unlock="${escapeAttr(info.key)}">${escapeHtml(betaMode ? "Unlock $0 beta downloads" : "Unlock final downloads")}</button>
         `}
       </div>
@@ -7878,9 +8681,16 @@ function bindPaymentGate(root) {
         setDownloadArea("Check the document-automation acknowledgement before unlocking final downloads.", "error");
         return;
       }
-      recordConsent("DOCUMENT_DOWNLOAD_ACKNOWLEDGMENT", "I understand that this service provides document automation and legal information, not legal advice. I understand that court or county staff may request additional information, forms, or steps depending on the facts of the estate.", true, CONSENT_VERSIONS.download);
+      const productKey = button.dataset.paymentUnlock || documentProductKey();
+      const launchGate = launchReleaseGateStatus(productKey);
+      if (!launchGate.canUnlock) {
+        setDownloadArea(`Downloads are blocked for production launch: ${launchGate.blockers[0] || "launch gate is not ready"}`, "error");
+        return;
+      }
+      recordConsent("DOCUMENT_DOWNLOAD_ACKNOWLEDGMENT", USER_AGREEMENT_ACKNOWLEDGMENT, true, CONSENT_VERSIONS.download);
       state.payment.status = "paid";
-      state.payment.productKey = button.dataset.paymentUnlock || documentProductKey();
+      state.payment.productKey = productKey;
+      state.payment.launchGateMode = launchGate.mode;
       state.payment.unlockedAt = new Date().toISOString();
       if (state.payment.deliveryMode === "secure_link") {
         createSecureDeliveryRecord(state.payment.productKey);
@@ -7897,17 +8707,22 @@ function bindPaymentGate(root) {
       }
       renderFormsView();
       renderReview();
-      setDownloadArea(BETA_UNLOCK_ENABLED ? "Beta document downloads are unlocked for this session." : "Final document downloads are unlocked for this prototype session.", "success");
+      setDownloadArea(CONTROLLED_BETA_MODE ? "Beta document downloads are unlocked for this session." : "Final document downloads are unlocked for this session.", "success");
     });
   });
 }
 
 function requireProductUnlock(productKey, label = "final documents") {
+  const launchGate = launchReleaseGateStatus(productKey);
+  if (!launchGate.canDownload) {
+    setDownloadArea(`Downloads are blocked for production launch: ${launchGate.blockers[0] || "launch gate is not ready"}`, "error");
+    return false;
+  }
   if (paymentUnlockedFor(productKey)) return true;
   renderFormsView();
   renderInterviewStatus();
   recordAnalyticsEvent("checkout_started", { productKey });
-  setDownloadArea(`${BETA_UNLOCK_ENABLED ? "Beta preview" : "Free preview"} is ready. Unlock the ${productInfo(productKey).title} before downloading ${label}.`, "error");
+  setDownloadArea(`${CONTROLLED_BETA_MODE ? "Beta preview" : "Free preview"} is ready. Unlock the ${productInfo(productKey).title} before downloading ${label}.`, "error");
   return false;
 }
 
@@ -7919,15 +8734,14 @@ function renderOpeningDocsHandoff() {
   const readiness = openingDocumentReadiness();
   const result = openingPacketResults();
   const includedOpeningForms = result.formDetails.filter((item) => item.status === "included" && item.key !== "pr1811");
-  const unlocked = paymentUnlockedFor(documentProductKey());
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
     <div class="handoff-card ${readiness.ready ? "ready" : "warn"}">
       <p class="eyebrow">Opening packet checkpoint</p>
-      <h3>${readiness.ready ? "Review complete. Unlock the opening packet when ready." : "Opening documents need a final review"}</h3>
+      <h3>${readiness.ready ? "Opening packet review is ready." : "Opening documents need more information"}</h3>
       <p>${readiness.ready
-        ? "Review the packet summary below. After the unlock step, the app will take you to one clean download and filing-instructions page."
+        ? "The next screen gives one final plain-English review before download, including forms, signers, missing information, interested persons, and the user agreement."
         : "The app has enough structure to show the packet, but the items below should be resolved before printing or filing."}</p>
       <div id="guidedDownloadArea" class="download-area"></div>
     </div>
@@ -7941,28 +8755,231 @@ function renderOpeningDocsHandoff() {
     ${readinessIssueListHtml("Court or county will usually supply", readiness.courtSupplied, "warn", "courtSupplied")}
     ${readinessIssueListHtml("Review notes", readiness.reviewWarnings, "warn", "reviewWarnings")}
     ${readiness.ready ? `
-      <div class="flow-divider"><span>${unlocked ? "Unlocked" : "Unlock"}</span></div>
-      ${unlocked ? `
-        <div class="handoff-card ready compact-handoff-card">
-          <p class="eyebrow">Downloads unlocked</p>
-          <h3>Continue to download and print.</h3>
-          <p>The next page has the opening packet ZIP and the filing checklist.</p>
-          <div class="handoff-actions single-action">
-            <button type="button" class="primary" data-continue-opening-download>Continue</button>
-          </div>
+      <div class="handoff-card ready compact-handoff-card">
+        <p class="eyebrow">Next</p>
+        <h3>Go to final review before download.</h3>
+        <p>Confirm the packet summary and user agreement before the app unlocks the opening packet ZIP.</p>
+        <div class="handoff-actions single-action">
+          <button type="button" class="primary" data-continue-final-review>Continue to final review</button>
         </div>
-      ` : paymentGateHtml("opening")}
+      </div>
     ` : `
       <div class="guided-note warn">
         <p>Fix the must-fix items above before unlocking or downloading the final opening packet.</p>
       </div>
     `}
   `;
+  wrapper.querySelector("[data-continue-final-review]")?.addEventListener("click", () => goToInterviewStep("final-review-download"));
+  bindReadinessIssueButtons(wrapper, readiness);
+  bindIssueJumpButtons(wrapper);
+  return wrapper;
+}
+
+function finalReviewBeforeDownloadComplete() {
+  const readiness = openingDocumentReadiness();
+  return readiness.ready && Boolean(state.payment.finalReviewAcknowledged) && paymentUnlockedFor(documentProductKey());
+}
+
+function finalReviewBeforeDownloadMessage() {
+  const readiness = openingDocumentReadiness();
+  if (!readiness.ready) return readiness.blockers[0] || "Resolve the must-fix packet items before final download.";
+  if (!state.payment.finalReviewAcknowledged) return "Review the packet summary and check the final-review acknowledgement.";
+  if (!paymentUnlockedFor(documentProductKey())) return "Unlock the final download to continue to filing instructions.";
+  return "";
+}
+
+function finalReviewFormSummaryHtml(result) {
+  const included = result.formDetails.filter((item) => item.status === "included" && item.key !== "pr1811");
+  return `
+    <section class="final-review-section">
+      <div class="row-heading">
+        <div>
+          <p class="eyebrow">Documents</p>
+          <h3>Your opening packet includes</h3>
+        </div>
+        <span class="badge">${included.length} forms/items</span>
+      </div>
+      <div class="packet-form-list final-review-forms">
+        ${packetFormRowsHtml(included)}
+      </div>
+    </section>
+  `;
+}
+
+function finalReviewSignatureSummaryHtml(data = state) {
+  const summary = signatureTrackingSummary(data);
+  const partyRows = summary.rows.filter((row) => row.required);
+  const courtRows = summary.rows.filter((row) => !row.required);
+  return `
+    <section class="final-review-section">
+      <div class="row-heading">
+        <div>
+          <p class="eyebrow">Signatures</p>
+          <h3>Who needs to sign</h3>
+        </div>
+        <span class="badge ${summary.pending ? "warn" : ""}">${partyRows.length} signer${partyRows.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="final-review-list">
+        ${partyRows.length ? partyRows.map((row) => `
+          <div class="final-review-row">
+            <strong>${escapeHtml(row.signer)}</strong>
+            <span>${escapeHtml(row.formNumber)} ${escapeHtml(row.formName)}</span>
+            <p>${escapeHtml(row.detail)}</p>
+          </div>
+        `).join("") : `<p class="helper-text">No party signature requirements were detected from the active packet.</p>`}
+      </div>
+      ${courtRows.length ? `
+        <details class="compact-help">
+          <summary>Court or registrar documents</summary>
+          <div class="final-review-list compact">
+            ${courtRows.map((row) => `
+              <div class="final-review-row muted">
+                <strong>${escapeHtml(row.formNumber)}</strong>
+                <span>${escapeHtml(row.formName)}</span>
+                <p>${escapeHtml(row.detail)}</p>
+              </div>
+            `).join("")}
+          </div>
+        </details>
+      ` : ""}
+    </section>
+  `;
+}
+
+function finalReviewOpenItemsHtml(readiness) {
+  const blockers = readiness.blockers || [];
+  const reviewWarnings = readiness.reviewWarnings || [];
+  const courtSupplied = readiness.courtSupplied || [];
+  return `
+    <section class="final-review-section ${blockers.length ? "warn" : ""}">
+      <div class="row-heading">
+        <div>
+          <p class="eyebrow">Readiness</p>
+          <h3>${blockers.length ? "Items to fix before download" : "No must-fix items found"}</h3>
+        </div>
+        <span class="badge ${blockers.length ? "bad" : ""}">${blockers.length} must-fix</span>
+      </div>
+      ${blockers.length ? readinessIssueListHtml("Must fix", blockers, "", "blockers") : `<p class="helper-text">The app did not find required missing information in the active opening packet review.</p>`}
+      ${reviewWarnings.length ? readinessIssueListHtml("Review notes", reviewWarnings, "warn", "reviewWarnings") : ""}
+      ${courtSupplied.length ? readinessIssueListHtml("Court or county may complete", courtSupplied, "warn", "courtSupplied") : ""}
+    </section>
+  `;
+}
+
+function finalReviewInterestedAuditHtml() {
+  const items = interestedPersonSourceReviewItems();
+  const summary = interestedPersonLegalAuditSummary(items);
+  const riskTone = summary.serviceAttention || summary.suggested || summary.missingAddress || summary.minorProtected ? "warn" : "";
+  return `
+    <section class="final-review-section ${riskTone}">
+      <div class="row-heading">
+        <div>
+          <p class="eyebrow">Interested persons</p>
+          <h3>Notice and waiver audit</h3>
+        </div>
+        <span class="badge ${riskTone}">${summary.included} included</span>
+      </div>
+      <div class="legal-audit-summary-grid">
+        <div><strong>${summary.heirs}</strong><span>heir/heirship</span></div>
+        <div><strong>${summary.willBeneficiaries}</strong><span>will beneficiaries</span></div>
+        <div><strong>${summary.fiduciaries}</strong><span>fiduciary/trust roles</span></div>
+        <div class="${summary.minorProtected ? "warn" : ""}"><strong>${summary.minorProtected}</strong><span>minor/protected</span></div>
+        <div class="${summary.missingAddress ? "warn" : ""}"><strong>${summary.missingAddress}</strong><span>address issues</span></div>
+        <div class="${summary.suggested ? "warn" : ""}"><strong>${summary.suggested}</strong><span>suggested not added</span></div>
+      </div>
+      <div class="final-review-list compact">
+        ${items.filter((item) => item.status === "included" || item.status === "suggested").slice(0, 6).map((item) => `
+          <div class="final-review-row ${item.tone || ""}">
+            <strong>${escapeHtml(item.name)}</strong>
+            <span>${escapeHtml(interestedPersonAuditTreatmentLabel(item))}</span>
+            <p>${escapeHtml(interestedPersonAuditActionText(item, item.status, item.service))}</p>
+          </div>
+        `).join("") || `<p class="helper-text">No interested-person audit rows were found yet.</p>`}
+      </div>
+      <details class="compact-help">
+        <summary>Open full interested-person audit</summary>
+        <p>Use the Interested Person Audit step to see every included, suggested, and excluded person/entity with detailed source reasons.</p>
+        <button type="button" class="secondary" data-open-interested-audit>Go to audit</button>
+      </details>
+    </section>
+  `;
+}
+
+function finalReviewAgreementHtml() {
+  return `
+    <section class="final-review-section agreement-section">
+      <div>
+        <p class="eyebrow">Agreement</p>
+        <h3>User agreement and responsibility</h3>
+        <p>${escapeHtml(USER_AGREEMENT_ACKNOWLEDGMENT)}</p>
+      </div>
+      <label class="inline-check final-review-check">
+        <input type="checkbox" data-final-review-ack ${state.payment.finalReviewAcknowledged ? "checked" : ""} />
+        <span>I reviewed the packet summary, signer list, interested-person audit, missing-info warnings, and user agreement before download.</span>
+      </label>
+      <p class="helper-text">Production launch still needs final terms, privacy policy, refund policy, support policy, and liability language reviewed by counsel.</p>
+    </section>
+  `;
+}
+
+function renderFinalReviewBeforeDownload() {
+  const readiness = openingDocumentReadiness();
+  const result = openingPacketResults();
+  const unlocked = paymentUnlockedFor(documentProductKey());
+  const canUnlock = readiness.ready && state.payment.finalReviewAcknowledged;
+  const wrapper = document.createElement("div");
+  wrapper.className = "guided-repeat final-review-screen";
+  wrapper.innerHTML = `
+    <div class="handoff-card ${readiness.ready ? "ready" : "warn"}">
+      <p class="eyebrow">Final review</p>
+      <h3>${readiness.ready ? "Review, agree, then unlock the download." : "Resolve these items before final download."}</h3>
+      <p>${readiness.ready
+        ? "This is the final checkpoint before the opening packet ZIP. Confirm the forms, signers, interested-person treatment, and user agreement."
+        : "The app can show the final review, but must-fix items should be resolved before unlocking or filing."}</p>
+      <div id="guidedDownloadArea" class="download-area"></div>
+    </div>
+    ${finalReviewFormSummaryHtml(result)}
+    ${finalReviewSignatureSummaryHtml()}
+    ${finalReviewOpenItemsHtml(readiness)}
+    ${finalReviewInterestedAuditHtml()}
+    ${finalReviewAgreementHtml()}
+    ${readiness.ready ? `
+      <div class="flow-divider"><span>${unlocked ? "Unlocked" : canUnlock ? "Unlock" : "Acknowledge"}</span></div>
+      ${unlocked ? `
+        <div class="handoff-card ready compact-handoff-card">
+          <p class="eyebrow">Downloads unlocked</p>
+          <h3>Continue to download and filing instructions.</h3>
+          <p>The next page contains the opening packet ZIP and the plain-English filing handoff.</p>
+          <div class="handoff-actions single-action">
+            <button type="button" class="primary" data-continue-opening-download>Continue</button>
+          </div>
+        </div>
+      ` : canUnlock ? paymentGateHtml("opening") : `
+        <div class="guided-note warn">
+          <p>Check the final-review acknowledgement above before unlocking the opening packet download.</p>
+        </div>
+      `}
+    ` : `
+      <div class="guided-note warn">
+        <p>Fix the must-fix items before the download unlock step appears.</p>
+      </div>
+    `}
+  `;
+  bindFinalReviewControls(wrapper, readiness);
+  return wrapper;
+}
+
+function bindFinalReviewControls(wrapper, readiness) {
+  wrapper.querySelector("[data-final-review-ack]")?.addEventListener("change", (event) => {
+    state.payment.finalReviewAcknowledged = event.currentTarget.checked;
+    saveState();
+    renderInterview();
+  });
+  wrapper.querySelector("[data-open-interested-audit]")?.addEventListener("click", () => goToInterviewStep("interested-source-review"));
   wrapper.querySelector("[data-continue-opening-download]")?.addEventListener("click", () => goToInterviewStep("opening-filing-instructions"));
   bindPaymentGate(wrapper);
   bindReadinessIssueButtons(wrapper, readiness);
   bindIssueJumpButtons(wrapper);
-  return wrapper;
 }
 
 function openingFilingInstructionsMessage() {
@@ -8022,6 +9039,7 @@ function renderOpeningFilingInstructions() {
   const result = openingPacketResults();
   const groups = openingFilingGroups(result);
   const unlocked = paymentUnlockedFor(documentProductKey());
+  const finalReviewDone = Boolean(state.payment.finalReviewAcknowledged);
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat filing-instructions-screen";
   wrapper.innerHTML = `
@@ -8029,13 +9047,17 @@ function renderOpeningFilingInstructions() {
       <p class="eyebrow">${unlocked ? "Download and print" : "Final handoff"}</p>
       <h3>${readiness.ready ? "Opening Packet Filing Instructions" : "Finish the packet before filing"}</h3>
       <p>${readiness.ready
-        ? unlocked
+        ? unlocked && finalReviewDone
           ? "Download the ZIP, print or review the documents, then use the checklist below for signing, filing, service, publication, and waiting for letters."
-          : "The packet is ready, but final downloads need to be unlocked before the ZIP can be downloaded."
+          : "Complete the final review and unlock step before the ZIP can be downloaded."
         : "The filing instructions are shown as a preview, but the must-fix items should be resolved before anyone signs, files, serves, publishes, or relies on this packet."}</p>
-      ${unlocked ? `
+      ${unlocked && finalReviewDone ? `
         <div class="handoff-actions single-action">
           <button type="button" class="primary" data-export-final-opening-packet ${readiness.ready ? "" : "disabled"}>Download opening packet ZIP</button>
+        </div>
+      ` : unlocked && !finalReviewDone ? `
+        <div class="handoff-actions single-action">
+          <button type="button" class="secondary" data-return-final-review>Complete final review first</button>
         </div>
       ` : ""}
       <div id="guidedDownloadArea" class="download-area"></div>
@@ -8043,7 +9065,12 @@ function renderOpeningFilingInstructions() {
     ${readinessIssueListHtml("Before signing, filing, serving, or publishing", readiness.blockers, "", "blockers")}
     ${readinessIssueListHtml("Court or county will usually supply", readiness.courtSupplied, "warn", "courtSupplied")}
     ${readinessIssueListHtml("Review notes", readiness.reviewWarnings, "warn", "reviewWarnings")}
-    ${readiness.ready && !unlocked ? paymentGateHtml("filing") : ""}
+    ${readiness.ready && !unlocked ? state.payment.finalReviewAcknowledged ? paymentGateHtml("opening") : `
+      <div class="guided-note warn">
+        <p>Complete the Final Review Before Download screen before unlocking the opening packet.</p>
+        <button type="button" class="secondary" data-return-final-review>Go to final review</button>
+      </div>
+    ` : ""}
     ${legalDisclaimerHtml("download")}
     <div class="filing-instruction-flow">
       ${groups.map(filingInstructionCardHtml).join("")}
@@ -8054,6 +9081,7 @@ function renderOpeningFilingInstructions() {
     </div>
   `;
   wrapper.querySelector("[data-export-final-opening-packet]")?.addEventListener("click", (event) => exportOpeningPacket(event));
+  wrapper.querySelector("[data-return-final-review]")?.addEventListener("click", () => goToInterviewStep("final-review-download"));
   bindPaymentGate(wrapper);
   bindReadinessIssueButtons(wrapper, readiness);
   bindIssueJumpButtons(wrapper);
@@ -8217,9 +9245,9 @@ function renderOpeningPathInterview() {
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
     <div class="guided-person-card">
-      <h3>Can everyone sign a PR-1803 waiver?</h3>
+      <h3>Will every required interested person sign a PR-1803 waiver?</h3>
       <div class="choice-grid stacked-choice-grid">
-        ${guidedChoiceButtonHtml("opening.waiverStatus", "all_signed", "Yes", "All known interested persons can sign or have signed.")}
+        ${guidedChoiceButtonHtml("opening.waiverStatus", "all_signed", "Yes", "All known interested persons are expected to sign or have signed.")}
         ${guidedChoiceButtonHtml("opening.waiverStatus", "not_all", "No", "At least one person cannot, will not, or should not sign.")}
         ${guidedChoiceButtonHtml("opening.waiverStatus", "unknown", "Not sure", "Keep gathering information before choosing the packet.")}
       </div>
@@ -8411,6 +9439,7 @@ function bindGuidedChoiceButtons(root) {
       const path = button.dataset.guidedChoicePath;
       const value = button.dataset.guidedChoiceValue;
       setPath(path, value);
+      handleWillStatusDefaults(path, value);
       if (path === "opening.waiverStatus" && value === "all_signed") {
         state.opening.unknownInterestedPersonsStatus = "none";
       }
@@ -8631,9 +9660,17 @@ function renderHeirshipChildren() {
         <label>Mailing address
           <input data-heirship-child-field="address" data-heirship-child-index="${index}" value="${escapeAttr(normalized.address)}" />
         </label>
-        <label>Minor date of birth
-          <input type="date" data-heirship-child-field="minorDateOfBirth" data-heirship-child-index="${index}" value="${escapeAttr(normalized.minorDateOfBirth)}" />
-        </label>
+        ${normalized.livingStatus === "deceased" ? `
+          <label>Date of death, if known
+            <input type="date" data-heirship-child-field="deceasedDate" data-heirship-child-index="${index}" value="${escapeAttr(normalized.deceasedDate)}" />
+          </label>
+        ` : ""}
+        ${normalized.livingStatus === "deceased" ? `
+          <label>Living children or descendants of this deceased child
+            <span class="field-hint">Enter each living grandchild or later descendant who may receive the deceased child's share. Use semicolons or one per line. If there are none, type none.</span>
+            <textarea rows="3" data-heirship-child-field="descendants" data-heirship-child-index="${index}" placeholder="Grandchild name, mailing address if known; another grandchild, mailing address if known">${escapeHtml(normalized.descendants)}</textarea>
+          </label>
+        ` : ""}
         <label>Notes
           <input data-heirship-child-field="notes" data-heirship-child-index="${index}" value="${escapeAttr(normalized.notes)}" placeholder="Adopted, deceased date, descendants, or follow-up" />
         </label>
@@ -8643,7 +9680,7 @@ function renderHeirshipChildren() {
   });
   const actions = document.createElement("div");
   actions.className = "list-bottom-actions";
-  actions.innerHTML = `<button type="button" class="secondary" data-add-heirship-child>Add child</button>`;
+  actions.innerHTML = `<button type="button" class="secondary prominent-add" data-add-heirship-child>Add another child</button>`;
   list.appendChild(actions);
   applyAddressPlaceholders(list);
 
@@ -8657,6 +9694,11 @@ function renderHeirshipChildren() {
       saveState();
       renderInterestedSuggestions();
       renderReview();
+      if (input.dataset.heirshipChildField === "livingStatus") {
+        renderHeirshipChildren();
+        renderInterviewStatus();
+        return;
+      }
       renderInterviewStatus();
     };
     input.addEventListener("input", update);
@@ -8708,12 +9750,7 @@ function renderWillBeneficiaries() {
         </label>
         <label>Role
           <select data-beneficiary-field="role" data-beneficiary-index="${index}">
-            <option value="beneficiary" ${person.role === "beneficiary" ? "selected" : ""}>Will beneficiary</option>
-            <option value="codicil_beneficiary" ${person.role === "codicil_beneficiary" ? "selected" : ""}>Codicil beneficiary</option>
-            <option value="trust_beneficiary" ${person.role === "trust_beneficiary" ? "selected" : ""}>Trust beneficiary</option>
-            <option value="trustee" ${person.role === "trustee" ? "selected" : ""}>Trustee</option>
-            <option value="entity" ${person.role === "entity" ? "selected" : ""}>Organization or charity</option>
-            <option value="other" ${person.role === "other" ? "selected" : ""}>Other person named in will</option>
+            ${beneficiaryRoleOptionsHtml(person.role)}
           </select>
         </label>
         <label>Relationship or description
@@ -8734,7 +9771,7 @@ function renderWillBeneficiaries() {
   });
   const actions = document.createElement("div");
   actions.className = "list-bottom-actions";
-  actions.innerHTML = `<button type="button" class="secondary" data-add-beneficiary-bottom>Add beneficiary</button>`;
+  actions.innerHTML = `<button type="button" class="secondary prominent-add" data-add-beneficiary-bottom>Add another beneficiary or named party</button>`;
   list.appendChild(actions);
   applyAddressPlaceholders(list);
 
@@ -8792,7 +9829,7 @@ function roleCheckboxHtml(index, role, label) {
 function waiverStatusOptionsHtml(selected = "") {
   return [
     ["", "Select"],
-    ["can_sign", "Can sign waiver"],
+    ["can_sign", "Will sign waiver"],
     ["cannot_sign", "Cannot sign waiver"],
     ["will_not_sign", "Will not sign"],
     ["not_eligible", "Not eligible to sign"],
@@ -8812,7 +9849,7 @@ function locationStatusOptionsHtml(selected = "known") {
 function serviceStatusBadgesHtml(person = {}) {
   const status = interestedPersonServiceStatus(person);
   const badges = [
-    status.canSignWaiver ? ["", "Can sign waiver"] : null,
+    status.canSignWaiver ? ["", "Will sign waiver"] : null,
     status.needsMailedNotice ? ["warn", "Needs notice"] : null,
     status.unknownOrMissing ? ["bad", "Unknown/missing"] : null,
     status.protectedPerson ? ["warn", "Minor/protected"] : null,
@@ -8842,17 +9879,32 @@ function interestedRelationship(person = {}) {
   return relationshipText([person.relationship, relationshipFromRoles(person)]);
 }
 
+function textDescribesMinorOrProtectedPerson(text = "") {
+  const value = cleanText(text).toLowerCase();
+  if (value.includes("protected person")) return true;
+  return /\bminor\b/.test(value) && !/\b(parent|mother|father|guardian|agent)\s+of\b/.test(value);
+}
+
+function textDescribesGuardianNeed(text = "") {
+  const value = cleanText(text).toLowerCase();
+  return value.includes("protected person")
+    || value.includes("needs guardian")
+    || value.includes("guardian/agent")
+    || value.includes("guardian or agent")
+    || value.includes("guardian needed");
+}
+
 function rolesFromSuggestionRelationship(relationship) {
   const text = cleanText(relationship).toLowerCase();
   const trustBeneficiary = text.includes("trust beneficiary");
-  const protectedPerson = text.includes("minor") || text.includes("protected person") || text.includes("guardian");
+  const protectedPerson = textDescribesMinorOrProtectedPerson(text) || textDescribesGuardianNeed(text);
   return {
     heir: text.includes("heir") || text.includes("proof of heirship") || text.includes("surviving spouse") || text.includes("domestic partner"),
     beneficiary: text.includes("beneficiary") || text.includes("charity") || text.includes("organization"),
     namedPr: text.includes("personal representative") || text.includes("proposed pr") || text.includes("named pr"),
     trustee: text.includes("trustee") && !trustBeneficiary,
     trustBeneficiary,
-    minor: protectedPerson && text.includes("minor"),
+    minor: textDescribesMinorOrProtectedPerson(text),
     needsGuardian: protectedPerson,
     military: text.includes("military") || text.includes("service member")
   };
@@ -8873,10 +9925,26 @@ function personNameInList(name, listValue) {
   return splitInterestedNames(listValue).some((item) => sameName(item, name));
 }
 
-function willBeneficiaryRolesForPerson(name) {
+function commonChildrenDoNotInheritByIntestacy(target = state) {
+  return target.will?.exists === "no"
+    && target.heirship?.spouse?.exists === "yes"
+    && target.heirship?.children?.exists === "yes"
+    && target.heirship?.children?.allOfSurvivingSpouse === "yes"
+    && !hasDeceasedChildDescendantDetails(target);
+}
+
+function personIsSurvivingCommonChild(name, target = state) {
+  if (!commonChildrenDoNotInheritByIntestacy(target)) return false;
+  return (target.heirship?.children?.people || []).some((child) => {
+    const normalized = normalizeHeirshipChild(child);
+    return sameName(name, normalized.name) && normalized.livingStatus !== "deceased";
+  }) || personNameInList(name, target.heirship?.children?.list);
+}
+
+function willBeneficiaryRolesForPerson(name, target = state) {
   const roles = {};
-  if (state.will?.exists !== "yes") return roles;
-  (state.willBeneficiaries || []).forEach((beneficiary) => {
+  if (target.will?.exists !== "yes") return roles;
+  (target.willBeneficiaries || []).forEach((beneficiary) => {
     if (!sameName(beneficiary.name, name)) return;
     const role = beneficiary.role || "beneficiary";
     if (role === "trustee") roles.trustee = true;
@@ -8895,27 +9963,33 @@ function willBeneficiaryRolesForPerson(name) {
   return roles;
 }
 
-function heirshipRolesForPerson(name) {
+function heirshipRolesForPerson(name, target = state) {
   const roles = {};
   if (!hasValue(name)) return roles;
-  if (sameName(name, state.heirship?.spouse?.name)) roles.heir = true;
-  (state.heirship?.children?.people || []).forEach((child) => {
-    if (!sameName(name, child.name)) return;
-    roles.heir = true;
-    if (hasValue(child.minorDateOfBirth)) {
+  if (sameName(name, target.heirship?.spouse?.name)) roles.heir = true;
+  const excludedCommonChild = personIsSurvivingCommonChild(name, target);
+  (target.heirship?.children?.people || []).forEach((child) => {
+    const normalizedChild = normalizeHeirshipChild(child);
+    if (!sameName(name, normalizedChild.name)) return;
+    if (normalizedChild.livingStatus !== "deceased" && !excludedCommonChild) roles.heir = true;
+    if (hasValue(normalizedChild.minorDateOfBirth)) {
       roles.minor = true;
       roles.needsGuardian = true;
     }
   });
-  if (personNameInList(name, state.heirship?.children?.list)) roles.heir = true;
-  if (personNameInList(name, state.heirship?.children?.deceasedChildDescendants)) roles.heir = true;
-  if (personNameInList(name, state.heirship?.parents?.names)) roles.heir = true;
-  if (personNameInList(name, state.heirship?.siblings?.names)) roles.heir = true;
-  if (personNameInList(name, state.heirship?.siblings?.deceasedSiblingDescendants)) roles.heir = true;
+  const matchedDeceasedChild = (target.heirship?.children?.people || []).some((child) => {
+    const normalizedChild = normalizeHeirshipChild(child);
+    return normalizedChild.livingStatus === "deceased" && sameName(name, normalizedChild.name);
+  });
+  if (!matchedDeceasedChild && !excludedCommonChild && personNameInList(name, target.heirship?.children?.list)) roles.heir = true;
+  if (deceasedChildDescendantEntries(target).some((entry) => sameName(name, entry.name))) roles.heir = true;
+  if (personNameInList(name, target.heirship?.parents?.names)) roles.heir = true;
+  if (personNameInList(name, target.heirship?.siblings?.names)) roles.heir = true;
+  if (personNameInList(name, target.heirship?.siblings?.deceasedSiblingDescendants)) roles.heir = true;
   return roles;
 }
 
-function inferredInterestedRoles(person = {}, suggestion = {}) {
+function inferredInterestedRoles(person = {}, suggestion = {}, target = state) {
   const normalized = normalizeInterestedPerson(person);
   const name = normalized.name || suggestion.name || "";
   const text = relationshipText([
@@ -8928,23 +10002,26 @@ function inferredInterestedRoles(person = {}, suggestion = {}) {
     normalized.roles,
     suggestion.roles,
     rolesFromSuggestionRelationship(text),
-    willBeneficiaryRolesForPerson(name),
-    heirshipRolesForPerson(name)
+    willBeneficiaryRolesForPerson(name, target),
+    heirshipRolesForPerson(name, target)
   );
-  if (sameName(name, state.pr?.fullName) || sameName(name, state.will?.namedPr)) roles.namedPr = true;
-  if (sameName(name, state.will?.namedTrustee) || sameName(name, state.will?.nominatedTrustee)) roles.trustee = true;
-  if (hasValue(normalized.minorDateOfBirth) || hasValue(suggestion.minorDateOfBirth) || text.includes("minor")) {
+  if (personIsSurvivingCommonChild(name, target) && !roles.beneficiary && !roles.namedPr && !roles.trustee && !roles.trustBeneficiary) {
+    roles.heir = false;
+  }
+  if (sameName(name, target.pr?.fullName) || sameName(name, target.will?.namedPr)) roles.namedPr = true;
+  if (willCreatesTestamentaryTrust(target) && (sameName(name, target.will?.namedTrustee) || sameName(name, target.will?.nominatedTrustee))) roles.trustee = true;
+  if (hasValue(normalized.minorDateOfBirth) || hasValue(suggestion.minorDateOfBirth) || textDescribesMinorOrProtectedPerson(text)) {
     roles.minor = true;
     roles.needsGuardian = true;
   }
-  if (text.includes("protected person") || text.includes("guardian")) roles.needsGuardian = true;
+  if (textDescribesGuardianNeed(text)) roles.needsGuardian = true;
   if (text.includes("military") || text.includes("service member")) roles.military = true;
   return roles;
 }
 
-function inferredInterestedService(person = {}, suggestion = {}) {
+function inferredInterestedService(person = {}, suggestion = {}, target = state) {
   const normalized = normalizeInterestedPerson(person);
-  const roles = inferredInterestedRoles(normalized, suggestion);
+  const roles = inferredInterestedRoles(normalized, suggestion, target);
   const service = { ...emptyInterestedPerson().service, ...(suggestion.service || {}), ...(normalized.service || {}) };
   const locationStatus = service.locationStatus || "known";
   const hasAddress = hasValue(normalized.address || suggestion.address);
@@ -8968,19 +10045,10 @@ function inferredInterestedService(person = {}, suggestion = {}) {
     }
   }
   if (unableToWaive) service.needsMailedNotice = true;
-  if (
-    state.opening?.waiverStatus === "all_signed"
-    && !hasValue(service.waiverStatus)
-    && hasAddress
-    && !protectedPerson
-    && !unknownOrMissing
-  ) {
-    service.waiverStatus = "can_sign";
-  }
   return service;
 }
 
-function applyInterestedPersonInferences(person = {}, suggestion = {}) {
+function applyInterestedPersonInferences(person = {}, suggestion = {}, target = state) {
   const normalized = normalizeInterestedPerson(person);
   if (!hasValue(normalized.name) && hasValue(suggestion.name)) normalized.name = cleanSuggestedPersonName(suggestion.name);
   normalized.relationship = relationshipText([normalized.relationship, suggestion.relationship]) || "Interested person";
@@ -8988,9 +10056,33 @@ function applyInterestedPersonInferences(person = {}, suggestion = {}) {
   if (!hasValue(normalized.minorDateOfBirth) && hasValue(suggestion.minorDateOfBirth)) {
     normalized.minorDateOfBirth = cleanText(suggestion.minorDateOfBirth);
   }
-  normalized.roles = inferredInterestedRoles(normalized, suggestion);
-  normalized.service = inferredInterestedService(normalized, suggestion);
+  normalized.roles = inferredInterestedRoles(normalized, suggestion, target);
+  normalized.service = inferredInterestedService(normalized, suggestion, target);
   return normalized;
+}
+
+function defaultServiceForSuggestedInterestedPerson(person = {}, target = state) {
+  const normalized = normalizeInterestedPerson(person);
+  const service = { ...(normalized.service || {}) };
+  const hasAddress = hasValue(normalized.address);
+  const protectedPerson = Boolean(service.protectedPerson || normalized.roles?.minor || normalized.roles?.needsGuardian || hasValue(normalized.minorDateOfBirth));
+  const locationStatus = service.locationStatus || (hasAddress ? "known" : "missing_address");
+  service.locationStatus = locationStatus;
+  if (protectedPerson) {
+    service.protectedPerson = true;
+    service.needsMailedNotice = true;
+    service.waiverStatus = service.waiverStatus || "not_eligible";
+    return service;
+  }
+  if (["cannot_locate", "unknown_person"].includes(locationStatus)) {
+    service.needsMailedNotice = true;
+    service.waiverStatus = service.waiverStatus || "unknown";
+    return service;
+  }
+  if (target.opening?.waiverStatus === "all_signed" && hasAddress && !hasValue(service.waiverStatus)) {
+    service.waiverStatus = "can_sign";
+  }
+  return service;
 }
 
 function enrichInterestedSuggestion(suggestion = {}) {
@@ -9006,7 +10098,7 @@ function enrichInterestedSuggestion(suggestion = {}) {
     enriched.roles.minor = true;
     enriched.roles.needsGuardian = true;
   }
-  enriched.service = inferredInterestedService(enriched, enriched);
+  enriched.service = defaultServiceForSuggestedInterestedPerson(applyInterestedPersonInferences(enriched, enriched), state);
   return enriched;
 }
 
@@ -9085,8 +10177,8 @@ function beneficiaryRoleLabel(role) {
   const labels = {
     beneficiary: "Will beneficiary",
     codicil_beneficiary: "Codicil beneficiary",
-    trust_beneficiary: "Trust beneficiary",
-    trustee: "Trustee named in will",
+    trust_beneficiary: "Trust beneficiary under will-created trust",
+    trustee: "Trustee under will-created trust",
     entity: "Organization or charity beneficiary",
     other: "Other person named in will"
   };
@@ -9257,18 +10349,20 @@ function interestedPersonSuggestions() {
       address: sameName(state.will.namedPr, state.pr.fullName) ? state.pr.address : "",
       source: "Will path"
     });
-    addInterestedSuggestion(suggestions, {
-      name: state.will.namedTrustee,
-      relationship: "Trustee named in will",
-      address: "",
-      source: "Will path"
-    });
-    addInterestedSuggestion(suggestions, {
-      name: state.will.nominatedTrustee,
-      relationship: "Nominated trustee",
-      address: "",
-      source: "Will path"
-    });
+    if (willCreatesTestamentaryTrust()) {
+      addInterestedSuggestion(suggestions, {
+        name: state.will.namedTrustee,
+        relationship: "Trustee named for will-created trust",
+        address: "",
+        source: "Will path"
+      });
+      addInterestedSuggestion(suggestions, {
+        name: state.will.nominatedTrustee,
+        relationship: "Nominated trustee for will-created trust",
+        address: "",
+        source: "Will path"
+      });
+    }
 
     if (state.will.hasNamedBeneficiaries === "yes") {
       state.willBeneficiaries.forEach((beneficiary) => {
@@ -9299,6 +10393,8 @@ function interestedPersonSuggestions() {
     : [];
   structuredChildren.forEach((child) => {
     const normalized = normalizeHeirshipChild(child);
+    if (normalized.livingStatus === "deceased") return;
+    if (personIsSurvivingCommonChild(normalized.name, state)) return;
     addInterestedSuggestion(suggestions, {
       name: normalized.name,
       relationship: relationshipText([
@@ -9313,6 +10409,7 @@ function interestedPersonSuggestions() {
   });
   if (childrenMarkedOrPresent && !structuredChildren.length) {
     splitInterestedNames(state.heirship.children.list).forEach((name) => {
+      if (personIsSurvivingCommonChild(name, state)) return;
       addInterestedSuggestion(suggestions, {
         name,
         relationship: "Heir - child/descendant",
@@ -9322,11 +10419,11 @@ function interestedPersonSuggestions() {
     });
   }
   if (childrenMarkedOrPresent) {
-    splitInterestedNames(state.heirship.children.deceasedChildDescendants).forEach((name) => {
+    deceasedChildDescendantEntries(state).forEach((entry) => {
       addInterestedSuggestion(suggestions, {
-        name,
-        relationship: "Heir - descendant of deceased child",
-        address: sameName(name, state.applicant.fullName) ? state.applicant.address : "",
+        name: entry.name,
+        relationship: relationshipText(["Heir - descendant of deceased child", entry.deceasedChildName ? `Descendant of ${entry.deceasedChildName}` : ""]),
+        address: entry.address || (sameName(entry.name, state.applicant.fullName) ? state.applicant.address : ""),
         source: "Proof of heirship"
       }, { allowSelectableName: true });
     });
@@ -9373,7 +10470,7 @@ function addInterestedSuggestion(suggestions, suggestion, options = {}) {
     existing.minorDateOfBirth = existing.minorDateOfBirth || enriched.minorDateOfBirth || "";
     existing.source = relationshipText([existing.source, enriched.source], " + ");
     existing.roles = mergeInterestedRoles(existing.roles, enriched.roles);
-    existing.service = inferredInterestedService({ ...existing, roles: existing.roles }, enriched);
+    existing.service = defaultServiceForSuggestedInterestedPerson(applyInterestedPersonInferences({ ...existing, roles: existing.roles }, enriched), state);
     return;
   }
   suggestions.push(enriched);
@@ -9526,9 +10623,26 @@ function renderInterestedSuggestions() {
   });
 }
 
+function refreshInterestedPersonViews() {
+  if (typeof document === "undefined") return;
+  renderInterestedPersons();
+  renderInterestedSuggestions();
+  renderReview();
+  renderInterviewStatus();
+}
+
 function addInterestedPersonSuggestion(suggestion) {
-  if (!suggestion || existingInterestedPersonIndex(suggestion.name) >= 0) return;
-  const person = interestedPersonFromSuggestion(suggestion);
+  if (!suggestion) return false;
+  const enriched = enrichInterestedSuggestion(suggestion);
+  if (!hasValue(enriched.name)) return false;
+  const existingIndex = existingInterestedPersonIndex(enriched.name);
+  if (existingIndex >= 0) {
+    state.interestedPersons[existingIndex] = applyInterestedPersonInferences(state.interestedPersons[existingIndex], enriched);
+    saveState();
+    refreshInterestedPersonViews();
+    return true;
+  }
+  const person = interestedPersonFromSuggestion(enriched);
   const blankIndex = state.interestedPersons.findIndex(blankInterestedPerson);
   if (blankIndex >= 0) {
     state.interestedPersons[blankIndex] = person;
@@ -9536,18 +10650,13 @@ function addInterestedPersonSuggestion(suggestion) {
     state.interestedPersons.push(person);
   }
   saveState();
-  renderInterestedPersons();
-  renderInterestedSuggestions();
-  renderReview();
-  renderInterviewStatus();
+  refreshInterestedPersonViews();
+  return true;
 }
 
 function addAllInterestedPersonSuggestions() {
   syncInterestedPersonRoster({ addMissing: true });
-  renderInterestedPersons();
-  renderInterestedSuggestions();
-  renderReview();
-  renderInterviewStatus();
+  refreshInterestedPersonViews();
 }
 
 function renderInventoryItems() {
@@ -9661,6 +10770,19 @@ function copyApplicantToPreparer() {
   saveState();
   renderFields();
   renderReview();
+  renderInterviewStatus();
+}
+
+function copyPrToPreparer() {
+  state.preparer.fullName = state.pr.fullName;
+  state.preparer.address = state.pr.address;
+  state.preparer.email = state.pr.email;
+  state.preparer.phone = state.pr.phone;
+  state.preparer.barNumber = state.pr.barNumber;
+  saveState();
+  renderFields();
+  renderReview();
+  renderInterviewStatus();
 }
 
 function applyCountyDefaultsFromButton() {
@@ -10116,8 +11238,8 @@ function validate() {
     }
   });
 
-  if (state.pr.isWisconsinResident === "no") {
-    warnings.push("Nonresident PR will need resident-agent handling on PR-1807.");
+  if (state.pr.isWisconsinResident === "no" && (!hasValue(state.pr.residentAgent.name) || !hasValue(state.pr.residentAgent.address))) {
+    warnings.push("Nonresident PR needs resident-agent name and address for PR-1807.");
   }
 
   const gross = Number(String(state.estate.estimatedGrossValue).replace(/[^0-9.]/g, ""));
@@ -10147,6 +11269,9 @@ function validate1806() {
   if (state.heirship.children.exists === "yes" && !childNamesEntered) {
     blockers.push("PR-1806 needs at least one child name because children is marked Yes. If the decedent had no children, change that answer to No.");
   }
+  deceasedChildrenMissingDescendantAnswer(state).forEach((child) => {
+    blockers.push(`PR-1806 needs children/descendant details or "none" for deceased child ${cleanText(child.name) || "(name missing)"}.`);
+  });
   if (state.heirship.spouse.exists === "yes" && state.heirship.children.exists === "yes" && !hasValue(state.heirship.children.allOfSurvivingSpouse)) {
     blockers.push("PR-1806 needs whether all children are also children of the surviving spouse/domestic partner.");
   }
@@ -10185,7 +11310,7 @@ function openingPathDecision(data = state) {
   const waiverStatus = data.opening?.waiverStatus || "";
   const willStatus = data.will?.exists || "";
   const serviceSummary = interestedPersonServiceSummary(data);
-  const hasPersonPathAnswers = serviceSummary.total > 0 && serviceSummary.unansweredWaiverCount === 0;
+  const hasPersonPathAnswers = serviceSummary.total > 0 && serviceSummary.rawUnansweredWaiverCount === 0;
   const broadUnknownOrMissing = data.opening?.unknownInterestedPersonsStatus === "some_unknown";
   const hasUnknownOrMissing = broadUnknownOrMissing || serviceSummary.unknownOrMissingCount > 0;
   const personNoticeNeeded = serviceSummary.requiresNotice;
@@ -10203,7 +11328,7 @@ function openingPathDecision(data = state) {
     return {
       key: "unknown",
       title: "Choose an opening path",
-      detail: "Answer whether every interested person can sign PR-1803 Waiver and Consent, or complete waiver status for each interested person.",
+      detail: "Answer whether every interested person is expected to sign PR-1803 Waiver and Consent, or complete waiver status for each interested person.",
       tone: "warn"
     };
   }
@@ -10212,6 +11337,14 @@ function openingPathDecision(data = state) {
       key: "unknown",
       title: "Confirm missing interested persons",
       detail: "Answer whether any interested person is unknown, missing, or not reasonably ascertainable before choosing the opening packet.",
+      tone: "warn"
+    };
+  }
+  if (serviceSummary.total > 0 && serviceSummary.rawUnansweredWaiverCount > 0) {
+    return {
+      key: "unknown",
+      title: "Finish waiver answers",
+      detail: `${serviceSummary.rawUnansweredWaiverCount} interested person${serviceSummary.rawUnansweredWaiverCount === 1 ? "" : "s"} still need a waiver-status answer before the app can choose PR-1803 or PR-1805.`,
       tone: "warn"
     };
   }
@@ -10281,9 +11414,10 @@ function validate1803(data = state) {
   if (!hasValue(data.estate.county)) blockers.push("PR-1803 needs the county.");
   if (!hasValue(data.decedent.fullName)) blockers.push("PR-1803 needs the decedent name.");
   if (!hasValue(data.pr.fullName)) blockers.push("PR-1803 needs the proposed personal representative name.");
-  if (!data.interestedPersons.length) blockers.push("PR-1803 needs at least one interested person.");
-  data.interestedPersons.forEach((person, index) => {
-    const status = interestedPersonServiceStatus(person);
+  const signers = activeInterestedPersonsForNotice(data);
+  if (!signers.length) blockers.push("PR-1803 needs at least one interested person.");
+  signers.forEach((person, index) => {
+    const status = interestedPersonServiceStatus(person, data);
     const label = cleanText(person.name) || `signer ${index + 1}`;
     if (!hasValue(person.name)) blockers.push(`PR-1803 signer ${index + 1} needs a name.`);
     if (!hasValue(person.address)) blockers.push(`PR-1803 ${label} needs a mailing address.`);
@@ -10291,7 +11425,10 @@ function validate1803(data = state) {
     if (status.unableToWaive) blockers.push(`PR-1803 ${label} is marked as unable, unwilling, not eligible, or protected; use the notice path or attorney review.`);
     if (status.unknownOrMissing) blockers.push(`PR-1803 ${label} is marked unknown or cannot be located; use the notice path or attorney review.`);
     if (person.service?.needsMailedNotice) warnings.push(`PR-1803 ${label} is marked as needing mailed notice; confirm a waiver-only opening is still appropriate.`);
-    if (!hasValue(person.service?.waiverStatus)) warnings.push(`PR-1803 ${label} does not have a waiver status answer yet.`);
+    if (!hasValue(person.service?.waiverStatus)) blockers.push(`PR-1803 ${label} needs a waiver-status answer.`);
+    if (hasValue(person.service?.waiverStatus) && person.service?.waiverStatus !== "can_sign") {
+      blockers.push(`PR-1803 ${label} is not marked as willing and eligible to sign a waiver.`);
+    }
   });
   if (data.will.exists === "yes") {
     if (!hasValue(data.will.date)) blockers.push("PR-1803 needs the will date for the will waiver path.");
@@ -10303,7 +11440,7 @@ function validate1803(data = state) {
       blockers.push("Choose whether waiver signers received the will copy or bequest notice.");
     }
   }
-  if (data.interestedPersons.length > 8) warnings.push("PR-1803 has room for eight signer blocks; extra signers will be listed on an attachment.");
+  if (signers.length > 8) warnings.push("PR-1803 has room for eight signer blocks; extra signers will be listed on an attachment.");
   return { blockers, warnings };
 }
 
@@ -10340,8 +11477,9 @@ function validate1817(data = state) {
   if (!data.service.originalOnFile && !data.service.copyAttached) blockers.push("PR-1817 needs original-on-file or copy-attached selected.");
   if (data.service.originalOnFile && data.service.copyAttached) warnings.push("PR-1817 should usually select either original-on-file or copy-attached, not both.");
   if (!hasValue(data.service.method)) blockers.push("PR-1817 needs the type of service.");
-  data.interestedPersons.forEach((person, index) => {
-    const status = interestedPersonServiceStatus(person);
+  const recipients = activeInterestedPersonsForNotice(data);
+  recipients.forEach((person, index) => {
+    const status = interestedPersonServiceStatus(person, data);
     const label = cleanText(person.name) || `recipient ${index + 1}`;
     if (!hasValue(person.name)) blockers.push(`PR-1817 recipient ${index + 1} needs a name.`);
     if (!hasValue(person.address)) blockers.push(`PR-1817 ${label} needs a mailing address.`);
@@ -10349,7 +11487,7 @@ function validate1817(data = state) {
     if (status.protectedPerson) warnings.push(`PR-1817 ${label} may need guardian/agent service review.`);
     if (status.person.roles?.military) warnings.push(`PR-1817 ${label} has a military-service flag; review service protections before defaulting.`);
   });
-  if (data.interestedPersons.length > 1) warnings.push("PR-1817 will use an attachment for multiple recipients.");
+  if (recipients.length > 1) warnings.push("PR-1817 will use an attachment for multiple recipients.");
   return { blockers, warnings };
 }
 
@@ -10371,7 +11509,6 @@ function validate1808(data = state) {
       blockers.push("PR-1808 needs the codicil date(s).");
     }
     if (!hasValue(data.will.location)) blockers.push("PR-1808 needs original will status.");
-    if (data.will.location === "en_route") warnings.push("PR-1808 has no en-route checkbox; court review may be needed.");
   }
   if (data.courtDrafts.prBondType === "surety" && !hasValue(data.courtDrafts.prBondAmount)) {
     blockers.push("PR-1808 needs a surety bond amount.");
@@ -10449,6 +11586,8 @@ function scenarioChild(name, address, options = {}) {
     name,
     address,
     livingStatus: options.livingStatus || "living",
+    deceasedDate: options.deceasedDate || "",
+    descendants: options.descendants || "",
     minorDateOfBirth: options.minorDateOfBirth || "",
     notes: options.notes || ""
   };
@@ -11016,8 +12155,8 @@ const testScenarios = [
   },
   {
     id: "no-will-all-waivers",
-    title: "No will, all interested persons can sign",
-    detail: "Adult children are known, addresses are complete, and everyone can sign PR-1803.",
+    title: "No will, all interested persons will sign",
+    detail: "Adult children are known, addresses are complete, and everyone is expected to sign PR-1803.",
     expected: {
       decisionKey: "waiver",
       readinessReady: true,
@@ -11029,9 +12168,2415 @@ const testScenarios = [
     }
   },
   {
+    id: "waiver-path-requires-person-waiver-status",
+    title: "Waiver path requires each person's waiver answer",
+    detail: "A broad all-waivers answer is not enough once interested persons are listed; each listed person must have waiver treatment before PR-1803 is ready.",
+    state: {
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown"
+      },
+      interestedPersons: [
+        scenarioPerson("Alex Decedent", "Adult child and heir; Proposed Personal Representative", "2200 West Park Street, Milwaukee, WI 53213", {
+          roles: { heir: true },
+          service: { waiverStatus: "", locationStatus: "known" }
+        }),
+        scenarioPerson("Morgan Decedent", "Adult child and heir", "700 South Pine Avenue, Wauwatosa, WI 53213", {
+          roles: { heir: true },
+          service: { waiverStatus: "", locationStatus: "known" }
+        })
+      ]
+    },
+    expected: {
+      decisionKey: "unknown",
+      readinessReady: false,
+      excludedForms: ["pr1803", "pr1804", "pr1805"],
+      serviceCounts: { rawUnansweredWaiverCount: 2 },
+      blockersContain: ["waiver-status answer"]
+    }
+  },
+  {
+    id: "no-will-common-children-spouse-takes-all",
+    title: "No will, surviving spouse and only common children",
+    detail: "When there is no will, a surviving spouse, and all surviving children are also children of that spouse, children stay on PR-1806 but are not automatically interested persons solely as intestate heirs.",
+    autoSyncInterestedPersons: true,
+    state: {
+      estate: { county: "Dane", estimatedGrossValue: "150000", estimatedNetValue: "150000" },
+      pathRouter: {
+        grossValue: "150000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "no",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Common Child Decedent",
+        dateOfBirth: "1950-01-01",
+        dateOfDeath: "2026-05-01",
+        domicileCounty: "Dane County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "10 Spouse Street, Madison, WI 53703"
+      },
+      applicant: {
+        fullName: "Surviving Spouse",
+        capacity: "Surviving spouse; heir; proposed personal representative",
+        address: "10 Spouse Street, Madison, WI 53703",
+        email: "spouse@example.com",
+        phone: "608-555-0199",
+        signatureDate: "2026-05-15"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Surviving Spouse",
+        address: "10 Spouse Street, Madison, WI 53703",
+        email: "spouse@example.com",
+        phone: "608-555-0199",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-05-15"
+      },
+      will: {
+        exists: "no",
+        noWillDiligentInquiry: true,
+        hasNamedBeneficiaries: "no",
+        namedPrNone: true
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown"
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      heirship: {
+        informant: { name: "Surviving Spouse", address: "10 Spouse Street, Madison, WI 53703", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Surviving Spouse" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Common Child One", "22 Child Road, Madison, WI 53703"),
+            scenarioChild("Common Child Two", "33 Child Road, Madison, WI 53703")
+          ],
+          list: "Common Child One; Common Child Two",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      interestedPersons: [
+        emptyInterestedPerson()
+      ],
+      requests: {
+        domiciliaryLettersTo: "Surviving Spouse",
+        interestedPersonsSeeAttached: false
+      },
+      service: {
+        declarantName: "Surviving Spouse",
+        declarantCity: "Madison",
+        declarantState: "Wisconsin",
+        serviceDate: "2026-05-15",
+        documentsProvided: "Application for Informal Administration and related opening documents",
+        originalOnFile: true,
+        method: "Mail",
+        signatureDate: "2026-05-15"
+      },
+      preparer: {
+        fullName: "Surviving Spouse",
+        address: "10 Spouse Street, Madison, WI 53703",
+        email: "spouse@example.com",
+        phone: "608-555-0199"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      interestedPersons: ["Surviving Spouse"],
+      excludedInterestedPersons: ["Common Child One", "Common Child Two"],
+      serviceCounts: { canSignWaiverCount: 1, rawUnansweredWaiverCount: 0, requiresNotice: false }
+    }
+  },
+  {
+    id: "batch2-robert-anderson-will-waiver",
+    title: "Batch 2: Robert J. Anderson will, spouse and adult children waive",
+    detail: "Will estate in Waukesha County. Surviving spouse is nominated PR and all adult heirs/beneficiaries support informal administration.",
+    state: {
+      estate: { county: "Waukesha", estimatedGrossValue: "385000", estimatedNetValue: "385000" },
+      pathRouter: {
+        grossValue: "385000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "no",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Robert J. Anderson",
+        dateOfBirth: "1952-05-12",
+        dateOfDeath: "2026-01-15",
+        domicileCounty: "Waukesha County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "1234 Oak Ridge Drive, Brookfield, WI 53005"
+      },
+      applicant: {
+        fullName: "Susan M. Anderson",
+        capacity: "Surviving spouse; beneficiary under will; proposed personal representative",
+        address: "1234 Oak Ridge Drive, Brookfield, WI 53005",
+        email: "susan.anderson@example.com",
+        phone: "262-555-0101",
+        signatureDate: "2026-02-01"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Susan M. Anderson",
+        address: "1234 Oak Ridge Drive, Brookfield, WI 53005",
+        email: "susan.anderson@example.com",
+        phone: "262-555-0101",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-02-01",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "yes",
+        date: "2018-06-10",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "original_accompanies",
+        namedPr: "Susan M. Anderson",
+        namedPrNone: false,
+        hasNamedBeneficiaries: "yes",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: false
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: ""
+      },
+      otherProceedings: {
+        status: "not_pending",
+        explanation: ""
+      },
+      notice1804: {
+        courthouseCounty: "Waukesha County Circuit Court",
+        courthouseAddress: "515 W. Moreland Boulevard, Waukesha, WI 53188",
+        room: "Register in Probate",
+        claimDeadline: "2026-05-20",
+        newspaperName: "Waukesha Freeman"
+      },
+      notice1805: {
+        courthouseCounty: "Waukesha County Circuit Court",
+        courthouseAddress: "515 W. Moreland Boulevard, Waukesha, WI 53188",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "",
+        hearingTime: "",
+        claimDeadline: "2026-05-20",
+        unknownInterestedPersons: "",
+        accommodationPhone: "262-548-7468",
+        checkExactTime: true,
+        newspaperName: "Waukesha Freeman"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Susan M. Anderson",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Susan M. Anderson", address: "1234 Oak Ridge Drive, Brookfield, WI 53005", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Susan M. Anderson" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Michael R. Anderson", "5421 Cedar Lane, Madison, WI 53711"),
+            scenarioChild("Emily J. Anderson", "2208 Birch Street, Eau Claire, WI 54701")
+          ],
+          list: "Michael R. Anderson; Emily J. Anderson",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [
+        { name: "Susan M. Anderson", role: "beneficiary", relationship: "Surviving spouse; residue beneficiary under will", address: "1234 Oak Ridge Drive, Brookfield, WI 53005", minorDateOfBirth: "", notes: "" },
+        { name: "Michael R. Anderson", role: "beneficiary", relationship: "Adult son; residue beneficiary under will", address: "5421 Cedar Lane, Madison, WI 53711", minorDateOfBirth: "", notes: "" },
+        { name: "Emily J. Anderson", role: "beneficiary", relationship: "Adult daughter; residue beneficiary under will", address: "2208 Birch Street, Eau Claire, WI 54701", minorDateOfBirth: "", notes: "" }
+      ],
+      interestedPersons: [
+        scenarioPerson("Susan M. Anderson", "Surviving spouse; beneficiary under will; nominated personal representative", "1234 Oak Ridge Drive, Brookfield, WI 53005", {
+          roles: { heir: true, beneficiary: true, namedPr: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Michael R. Anderson", "Adult son; beneficiary under will", "5421 Cedar Lane, Madison, WI 53711", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Emily J. Anderson", "Adult daughter; beneficiary under will", "2208 Birch Street, Eau Claire, WI 54701", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Susan M. Anderson",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Susan M. Anderson",
+        address: "1234 Oak Ridge Drive, Brookfield, WI 53005",
+        email: "susan.anderson@example.com",
+        phone: "262-555-0101"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      readinessReady: true,
+      includedForms: ["originalWill", "pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"],
+      excludedForms: ["pr1805"],
+      interestedPersons: ["Susan M. Anderson", "Michael R. Anderson", "Emily J. Anderson"],
+      serviceCounts: { canSignWaiverCount: 3, rawUnansweredWaiverCount: 0, requiresNotice: false },
+      noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
+    }
+  },
+  {
+    id: "batch2-melissa-johnson-no-will-minor-heirs-medicaid",
+    title: "Batch 2: Melissa R. Johnson no will with minor heirs and Medicaid",
+    detail: "No-will estate in Milwaukee County with surviving spouse, minor children, real estate, and Medicaid Estate Recovery concern.",
+    state: {
+      estate: { county: "Milwaukee", estimatedGrossValue: "168000", estimatedNetValue: "168000" },
+      pathRouter: {
+        grossValue: "168000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "yes",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Melissa R. Johnson",
+        dateOfBirth: "1983-08-18",
+        dateOfDeath: "2025-11-22",
+        domicileCounty: "Milwaukee County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "8450 West Burleigh Street, Milwaukee, WI 53222"
+      },
+      applicant: {
+        fullName: "David L. Johnson",
+        capacity: "Surviving spouse; heir; proposed personal representative",
+        address: "8450 West Burleigh Street, Milwaukee, WI 53222",
+        email: "david.johnson@example.com",
+        phone: "414-555-0102",
+        signatureDate: "2025-12-15"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "David L. Johnson",
+        address: "8450 West Burleigh Street, Milwaukee, WI 53222",
+        email: "david.johnson@example.com",
+        phone: "414-555-0102",
+        isWisconsinResident: "yes",
+        signatureDate: "2025-12-15",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "no",
+        date: "",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "",
+        namedPr: "",
+        namedPrNone: true,
+        hasNamedBeneficiaries: "no",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: true
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: ""
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      benefits: {
+        medicalAssistance: "did",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "Melissa received Wisconsin Medicaid benefits for approximately two years before death; Medicaid Estate Recovery may need to be addressed.",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "David L. Johnson",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "David L. Johnson", address: "8450 West Burleigh Street, Milwaukee, WI 53222", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "David L. Johnson" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Emma Johnson", "8450 West Burleigh Street, Milwaukee, WI 53222", { minorDateOfBirth: "2012-03-08" }),
+            scenarioChild("Liam Johnson", "8450 West Burleigh Street, Milwaukee, WI 53222", { minorDateOfBirth: "2015-09-17" })
+          ],
+          list: "Emma Johnson; Liam Johnson",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      interestedPersons: [
+        scenarioPerson("David L. Johnson", "Surviving spouse; heir; proposed personal representative", "8450 West Burleigh Street, Milwaukee, WI 53222", {
+          roles: { heir: true, namedPr: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "David L. Johnson",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "David L. Johnson",
+        declarantCity: "Milwaukee",
+        declarantState: "Wisconsin",
+        declarantAddress: "8450 West Burleigh Street, Milwaukee, WI 53222",
+        declarantEmail: "david.johnson@example.com",
+        declarantPhone: "414-555-0102",
+        serviceDate: "2025-12-15",
+        documentsProvided: "Application for Informal Administration and related opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2025-12-15"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "David L. Johnson",
+        address: "8450 West Burleigh Street, Milwaukee, WI 53222",
+        email: "david.johnson@example.com",
+        phone: "414-555-0102"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      readinessReady: true,
+      includedForms: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"],
+      excludedForms: ["originalWill", "pr1805"],
+      interestedPersons: ["David L. Johnson"],
+      excludedInterestedPersons: ["Emma Johnson", "Liam Johnson", "Karen R. Miller"],
+      serviceCounts: { canSignWaiverCount: 1, protectedCount: 0, mailedNoticeCount: 0, requiresNotice: false },
+      noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
+    }
+  },
+  {
+    id: "batch2-harold-peterson-will-codicil-minor-beneficiaries",
+    title: "Batch 2: Harold T. Peterson will and codicil with minor beneficiaries",
+    detail: "Will estate in Brown County with adult children, codicil gifts to minors, and guardian/service handling.",
+    state: {
+      estate: { county: "Brown", estimatedGrossValue: "1275000", estimatedNetValue: "1275000" },
+      pathRouter: {
+        grossValue: "1275000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "no",
+        everyoneAgrees: "yes",
+        publicBenefits: "unknown",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Harold T. Peterson",
+        dateOfBirth: "1947-02-27",
+        dateOfDeath: "2026-04-04",
+        domicileCounty: "Brown County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "2789 Riverside Court, Green Bay, WI 54311"
+      },
+      applicant: {
+        fullName: "Jennifer L. Peterson",
+        capacity: "Adult daughter; beneficiary under will; nominated personal representative; proposed personal representative",
+        address: "912 Harbor View Drive, Green Bay, WI 54303",
+        email: "jennifer.peterson@example.com",
+        phone: "920-555-0103",
+        signatureDate: "2026-04-20"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Jennifer L. Peterson",
+        address: "912 Harbor View Drive, Green Bay, WI 54303",
+        email: "jennifer.peterson@example.com",
+        phone: "920-555-0103",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-04-20",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "yes",
+        date: "2015-02-14",
+        hasCodicils: "yes",
+        codicilDates: "2021-08-30",
+        location: "original_accompanies",
+        namedPr: "Jennifer L. Peterson",
+        namedPrNone: false,
+        hasNamedBeneficiaries: "yes",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: false
+      },
+      opening: {
+        waiverStatus: "not_all",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "minor_or_protected_person",
+        peopleWhoCannotSign: "Olivia Peterson; Noah Peterson",
+        peopleNotFound: ""
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1805: {
+        courthouseCounty: "Brown County Circuit Court",
+        courthouseAddress: "100 South Jefferson Street, Green Bay, WI 54301",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "2026-05-20",
+        hearingTime: "9:00 AM",
+        claimDeadline: "2026-09-01",
+        unknownInterestedPersons: "",
+        accommodationPhone: "920-448-4275",
+        checkExactTime: true,
+        newspaperName: "Green Bay Press-Gazette"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "",
+        communityOptions: "",
+        chronicDisease: "",
+        institution: "was_not",
+        explanation: "Applicant lacks information about Family Care, Community Options Program, and Wisconsin Chronic Disease Program benefits.",
+        lackInfo: true
+      },
+      spouse: {
+        everMarried: "unknown",
+        fullName: "",
+        livingStatus: "deceased",
+        statusAtDeath: "",
+        communityOptions: "",
+        chronicDisease: "",
+        seeAttached: false,
+        lackInfo: true
+      },
+      heirship: {
+        informant: { name: "Jennifer L. Peterson", address: "912 Harbor View Drive, Green Bay, WI 54303", relationship: "Adult daughter" },
+        spouse: { exists: "no", name: "" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Jennifer L. Peterson", "912 Harbor View Drive, Green Bay, WI 54303"),
+            scenarioChild("Thomas A. Peterson", "380 Lakewood Avenue, Appleton, WI 54914")
+          ],
+          list: "Jennifer L. Peterson; Thomas A. Peterson",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "not_applicable",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [
+        { name: "Jennifer L. Peterson", role: "beneficiary", relationship: "Adult daughter; residue beneficiary under will", address: "912 Harbor View Drive, Green Bay, WI 54303", minorDateOfBirth: "", notes: "" },
+        { name: "Thomas A. Peterson", role: "beneficiary", relationship: "Adult son; residue beneficiary under will", address: "380 Lakewood Avenue, Appleton, WI 54914", minorDateOfBirth: "", notes: "" },
+        { name: "Olivia Peterson", role: "beneficiary", relationship: "Minor granddaughter; $50,000 codicil beneficiary", address: "1777 Woodland Circle, Green Bay, WI 54313", minorDateOfBirth: "2010-07-12", notes: "" },
+        { name: "Noah Peterson", role: "beneficiary", relationship: "Minor grandson; $50,000 codicil beneficiary", address: "1777 Woodland Circle, Green Bay, WI 54313", minorDateOfBirth: "2013-12-03", notes: "" }
+      ],
+      interestedPersons: [
+        scenarioPerson("Jennifer L. Peterson", "Adult daughter; beneficiary under will; nominated personal representative", "912 Harbor View Drive, Green Bay, WI 54303", {
+          roles: { heir: true, beneficiary: true, namedPr: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Thomas A. Peterson", "Adult son; beneficiary under will", "380 Lakewood Avenue, Appleton, WI 54914", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Olivia Peterson", "Minor beneficiary under will", "1777 Woodland Circle, Green Bay, WI 54313", {
+          minorDateOfBirth: "2010-07-12",
+          roles: { beneficiary: true, minor: true, needsGuardian: true },
+          service: { waiverStatus: "not_eligible", locationStatus: "known", protectedPerson: true, needsMailedNotice: true }
+        }),
+        scenarioPerson("Noah Peterson", "Minor beneficiary under will", "1777 Woodland Circle, Green Bay, WI 54313", {
+          minorDateOfBirth: "2013-12-03",
+          roles: { beneficiary: true, minor: true, needsGuardian: true },
+          service: { waiverStatus: "not_eligible", locationStatus: "known", protectedPerson: true, needsMailedNotice: true }
+        }),
+        scenarioPerson("Sarah M. Peterson", "Mother and natural guardian of Olivia and Noah Peterson", "1777 Woodland Circle, Green Bay, WI 54313", {
+          roles: {},
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Jennifer L. Peterson",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Jennifer L. Peterson",
+        declarantCity: "Green Bay",
+        declarantState: "Wisconsin",
+        declarantAddress: "912 Harbor View Drive, Green Bay, WI 54303",
+        declarantEmail: "jennifer.peterson@example.com",
+        declarantPhone: "920-555-0103",
+        serviceDate: "2026-04-20",
+        documentsProvided: "PR-1805 notice and informal probate opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-04-20"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Jennifer L. Peterson",
+        address: "912 Harbor View Drive, Green Bay, WI 54303",
+        email: "jennifer.peterson@example.com",
+        phone: "920-555-0103"
+      }
+    },
+    expected: {
+      routeKey: "attorney_review",
+      decisionKey: "notice",
+      readinessReady: true,
+      includedForms: ["originalWill", "pr1801", "pr1805", "pr1806", "pr1807", "pr1808", "pr1810", "pr1817"],
+      excludedForms: ["pr1803", "pr1804"],
+      interestedPersons: ["Jennifer L. Peterson", "Thomas A. Peterson", "Olivia Peterson", "Noah Peterson", "Sarah M. Peterson"],
+      serviceCounts: { canSignWaiverCount: 3, protectedCount: 2, mailedNoticeCount: 2, requiresNotice: true },
+      warningsContain: ["guardian/agent service review"],
+      noBlockersFor: ["pr1801", "pr1805", "pr1806", "pr1807", "pr1808", "pr1810", "pr1817"]
+    }
+  },
+  {
+    id: "batch2-eleanor-richards-will-benefits-creditor",
+    title: "Batch 2: Eleanor M. Richards will with public benefits and known creditor",
+    detail: "Will estate in La Crosse County with adult children, Medicaid/Family Care facts, a known creditor, and all required beneficiaries expected to waive.",
+    state: {
+      estate: { county: "La Crosse", estimatedGrossValue: "500000", estimatedNetValue: "500000" },
+      pathRouter: {
+        grossValue: "500000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "yes",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Eleanor M. Richards",
+        dateOfBirth: "1938-10-06",
+        dateOfDeath: "2026-02-11",
+        domicileCounty: "La Crosse County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "419 Maple Grove Lane, La Crosse, WI 54601"
+      },
+      applicant: {
+        fullName: "Daniel P. Richards",
+        capacity: "Adult son; sole beneficiary under will; nominated personal representative; proposed personal representative",
+        address: "877 Oak Terrace, Onalaska, WI 54650",
+        email: "daniel.richards@example.com",
+        phone: "608-555-0104",
+        signatureDate: "2026-02-25"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Daniel P. Richards",
+        address: "877 Oak Terrace, Onalaska, WI 54650",
+        email: "daniel.richards@example.com",
+        phone: "608-555-0104",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-02-25",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "yes",
+        date: "2019-09-14",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "original_accompanies",
+        namedPr: "Daniel P. Richards",
+        namedPrNone: false,
+        hasNamedBeneficiaries: "yes",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: false
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: "",
+        publicationNotes: "Known creditor: First State Bank, 205 Main Street, La Crosse, WI 54601. Public-benefits estate recovery is expected."
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1804: {
+        courthouseCounty: "La Crosse County Circuit Court",
+        courthouseAddress: "333 Vine Street, La Crosse, WI 54601",
+        room: "Register in Probate",
+        claimDeadline: "2026-06-15",
+        newspaperName: "La Crosse Tribune"
+      },
+      notice1805: {
+        courthouseCounty: "La Crosse County Circuit Court",
+        courthouseAddress: "333 Vine Street, La Crosse, WI 54601",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "",
+        hearingTime: "",
+        claimDeadline: "2026-06-15",
+        unknownInterestedPersons: "",
+        accommodationPhone: "608-785-9590",
+        checkExactTime: true,
+        newspaperName: "La Crosse Tribune"
+      },
+      benefits: {
+        medicalAssistance: "did",
+        familyCare: "did",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "Eleanor received Wisconsin Medicaid and Family Care benefits during the final three years of life; estate recovery is expected.",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Predeceased spouse",
+        livingStatus: "deceased",
+        statusAtDeath: "widowed",
+        communityOptions: "",
+        chronicDisease: "",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Daniel P. Richards", address: "877 Oak Terrace, Onalaska, WI 54650", relationship: "Adult son" },
+        spouse: { exists: "no", name: "" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Daniel P. Richards", "877 Oak Terrace, Onalaska, WI 54650"),
+            scenarioChild("Karen J. Richards", "1435 Willow Court, Rochester, MN 55901"),
+            scenarioChild("Steven A. Richards", "1016 Woodland Avenue, Madison, WI 53704")
+          ],
+          list: "Daniel P. Richards; Karen J. Richards; Steven A. Richards",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "not_applicable",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [
+        { name: "Daniel P. Richards", role: "beneficiary", relationship: "Adult son; primary beneficiary under will", address: "877 Oak Terrace, Onalaska, WI 54650", minorDateOfBirth: "", notes: "Residence and most financial assets." },
+        { name: "Karen J. Richards", role: "beneficiary", relationship: "Adult daughter; specific cash beneficiary under will", address: "1435 Willow Court, Rochester, MN 55901", minorDateOfBirth: "", notes: "$25,000 cash gift." },
+        { name: "Steven A. Richards", role: "beneficiary", relationship: "Adult son; specific cash beneficiary under will", address: "1016 Woodland Avenue, Madison, WI 53704", minorDateOfBirth: "", notes: "$25,000 cash gift." }
+      ],
+      interestedPersons: [
+        scenarioPerson("Daniel P. Richards", "Adult son; sole beneficiary under will; nominated personal representative", "877 Oak Terrace, Onalaska, WI 54650", {
+          roles: { heir: true, beneficiary: true, namedPr: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Karen J. Richards", "Adult daughter; beneficiary under will", "1435 Willow Court, Rochester, MN 55901", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Steven A. Richards", "Adult son; beneficiary under will", "1016 Woodland Avenue, Madison, WI 53704", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Daniel P. Richards",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Daniel P. Richards",
+        declarantCity: "Onalaska",
+        declarantState: "Wisconsin",
+        declarantAddress: "877 Oak Terrace, Onalaska, WI 54650",
+        declarantEmail: "daniel.richards@example.com",
+        declarantPhone: "608-555-0104",
+        serviceDate: "2026-02-25",
+        documentsProvided: "Application for Informal Administration and related opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-02-25"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Daniel P. Richards",
+        address: "877 Oak Terrace, Onalaska, WI 54650",
+        email: "daniel.richards@example.com",
+        phone: "608-555-0104"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      readinessReady: true,
+      includedForms: ["originalWill", "pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"],
+      excludedForms: ["pr1805"],
+      interestedPersons: ["Daniel P. Richards", "Karen J. Richards", "Steven A. Richards"],
+      serviceCounts: { canSignWaiverCount: 3, rawUnansweredWaiverCount: 0, requiresNotice: false },
+      noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
+    }
+  },
+  {
+    id: "batch2-gregory-walker-will-codicil-charity",
+    title: "Batch 2: Gregory S. Walker will and codicil with charity beneficiary",
+    detail: "Will estate in Winnebago County with spouse, adult children, a charitable codicil beneficiary, and all beneficiaries expected to waive.",
+    state: {
+      estate: { county: "Winnebago", estimatedGrossValue: "1227000", estimatedNetValue: "1227000" },
+      pathRouter: {
+        grossValue: "1227000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "no",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Gregory S. Walker",
+        dateOfBirth: "1961-01-21",
+        dateOfDeath: "2026-03-03",
+        domicileCounty: "Winnebago County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "711 Crestview Drive, Oshkosh, WI 54904"
+      },
+      applicant: {
+        fullName: "Rachel M. Walker",
+        capacity: "Surviving spouse; beneficiary under will; nominated personal representative; proposed personal representative",
+        address: "711 Crestview Drive, Oshkosh, WI 54904",
+        email: "rachel.walker@example.com",
+        phone: "920-555-0105",
+        signatureDate: "2026-03-18"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Rachel M. Walker",
+        address: "711 Crestview Drive, Oshkosh, WI 54904",
+        email: "rachel.walker@example.com",
+        phone: "920-555-0105",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-03-18",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "yes",
+        date: "2022-05-17",
+        hasCodicils: "yes",
+        codicilDates: "2024-12-08",
+        location: "original_accompanies",
+        namedPr: "Rachel M. Walker",
+        namedPrNone: false,
+        hasNamedBeneficiaries: "yes",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: false
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: ""
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1804: {
+        courthouseCounty: "Winnebago County Circuit Court",
+        courthouseAddress: "415 Jackson Street, Oshkosh, WI 54901",
+        room: "Register in Probate",
+        claimDeadline: "2026-07-06",
+        newspaperName: "Oshkosh Herald"
+      },
+      notice1805: {
+        courthouseCounty: "Winnebago County Circuit Court",
+        courthouseAddress: "415 Jackson Street, Oshkosh, WI 54901",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "",
+        hearingTime: "",
+        claimDeadline: "2026-07-06",
+        unknownInterestedPersons: "",
+        accommodationPhone: "920-236-4848",
+        checkExactTime: true,
+        newspaperName: "Oshkosh Herald"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Rachel M. Walker",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Rachel M. Walker", address: "711 Crestview Drive, Oshkosh, WI 54904", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Rachel M. Walker" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Andrew G. Walker", "1820 Prairie View Road, Appleton, WI 54913"),
+            scenarioChild("Lauren E. Walker", "533 River Bend Court, Neenah, WI 54956")
+          ],
+          list: "Andrew G. Walker; Lauren E. Walker",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [
+        { name: "Rachel M. Walker", role: "beneficiary", relationship: "Surviving spouse; residue beneficiary under will", address: "711 Crestview Drive, Oshkosh, WI 54904", minorDateOfBirth: "", notes: "" },
+        { name: "Andrew G. Walker", role: "beneficiary", relationship: "Adult son; residue beneficiary under will", address: "1820 Prairie View Road, Appleton, WI 54913", minorDateOfBirth: "", notes: "" },
+        { name: "Lauren E. Walker", role: "beneficiary", relationship: "Adult daughter; residue beneficiary under will", address: "533 River Bend Court, Neenah, WI 54956", minorDateOfBirth: "", notes: "" },
+        { name: "Children's Hospital Foundation", role: "beneficiary", relationship: "Charitable beneficiary under codicil", address: "8915 West Connell Court, Milwaukee, WI 53226", minorDateOfBirth: "", notes: "$50,000 specific bequest." }
+      ],
+      interestedPersons: [
+        scenarioPerson("Rachel M. Walker", "Surviving spouse; beneficiary under will; nominated personal representative", "711 Crestview Drive, Oshkosh, WI 54904", {
+          roles: { heir: true, beneficiary: true, namedPr: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Andrew G. Walker", "Adult son; beneficiary under will", "1820 Prairie View Road, Appleton, WI 54913", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Lauren E. Walker", "Adult daughter; beneficiary under will", "533 River Bend Court, Neenah, WI 54956", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Children's Hospital Foundation", "Charitable beneficiary under will", "8915 West Connell Court, Milwaukee, WI 53226", {
+          roles: { beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Rachel M. Walker",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Rachel M. Walker",
+        declarantCity: "Oshkosh",
+        declarantState: "Wisconsin",
+        declarantAddress: "711 Crestview Drive, Oshkosh, WI 54904",
+        declarantEmail: "rachel.walker@example.com",
+        declarantPhone: "920-555-0105",
+        serviceDate: "2026-03-18",
+        documentsProvided: "Application for Informal Administration and related opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-03-18"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Rachel M. Walker",
+        address: "711 Crestview Drive, Oshkosh, WI 54904",
+        email: "rachel.walker@example.com",
+        phone: "920-555-0105"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      readinessReady: true,
+      includedForms: ["originalWill", "pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"],
+      excludedForms: ["pr1805"],
+      interestedPersons: ["Rachel M. Walker", "Andrew G. Walker", "Lauren E. Walker", "Children's Hospital Foundation"],
+      serviceCounts: { canSignWaiverCount: 4, rawUnansweredWaiverCount: 0, requiresNotice: false },
+      noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
+    }
+  },
+  {
+    id: "batch2-patricia-nguyen-no-will-adult-heirs",
+    title: "Batch 2: Patricia A. Nguyen no will with adult heirs and potential minor descendant",
+    detail: "No-will estate in Portage County where the surviving spouse and adult children can waive; a minor granddaughter is tracked as excluded because her parent survives.",
+    state: {
+      estate: { county: "Portage", estimatedGrossValue: "450000", estimatedNetValue: "450000" },
+      pathRouter: {
+        grossValue: "450000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "yes",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Patricia A. Nguyen",
+        dateOfBirth: "1958-06-14",
+        dateOfDeath: "2026-01-29",
+        domicileCounty: "Portage County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "942 Evergreen Terrace, Stevens Point, WI 54481"
+      },
+      applicant: {
+        fullName: "Kevin T. Nguyen",
+        capacity: "Surviving spouse; heir; proposed personal representative",
+        address: "942 Evergreen Terrace, Stevens Point, WI 54481",
+        email: "kevin.nguyen@example.com",
+        phone: "715-555-0106",
+        signatureDate: "2026-02-12"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Kevin T. Nguyen",
+        address: "942 Evergreen Terrace, Stevens Point, WI 54481",
+        email: "kevin.nguyen@example.com",
+        phone: "715-555-0106",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-02-12",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "no",
+        date: "",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "",
+        namedPr: "",
+        namedPrNone: true,
+        hasNamedBeneficiaries: "no",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: true
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: "",
+        publicationNotes: "Minor granddaughter Sophia Nguyen is not expected to inherit because her parent survives Patricia."
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1804: {
+        courthouseCounty: "Portage County Circuit Court",
+        courthouseAddress: "1516 Church Street, Stevens Point, WI 54481",
+        room: "Register in Probate",
+        claimDeadline: "2026-06-01",
+        newspaperName: "Stevens Point Journal"
+      },
+      notice1805: {
+        courthouseCounty: "Portage County Circuit Court",
+        courthouseAddress: "1516 Church Street, Stevens Point, WI 54481",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "",
+        hearingTime: "",
+        claimDeadline: "2026-06-01",
+        unknownInterestedPersons: "",
+        accommodationPhone: "715-346-1364",
+        checkExactTime: true,
+        newspaperName: "Stevens Point Journal"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did",
+        institution: "was_not",
+        explanation: "Patricia received Wisconsin Chronic Disease Program benefits.",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Kevin T. Nguyen",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Kevin T. Nguyen", address: "942 Evergreen Terrace, Stevens Point, WI 54481", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Kevin T. Nguyen" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Jennifer L. Nguyen", "3715 Oak Hollow Drive, Wausau, WI 54403"),
+            scenarioChild("Brian K. Nguyen", "1832 Meadow Creek Lane, Madison, WI 53719")
+          ],
+          list: "Jennifer L. Nguyen; Brian K. Nguyen",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [],
+      interestedPersons: [
+        scenarioPerson("Kevin T. Nguyen", "Surviving spouse; heir; proposed personal representative", "942 Evergreen Terrace, Stevens Point, WI 54481", {
+          roles: { heir: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Kevin T. Nguyen",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Kevin T. Nguyen",
+        declarantCity: "Stevens Point",
+        declarantState: "Wisconsin",
+        declarantAddress: "942 Evergreen Terrace, Stevens Point, WI 54481",
+        declarantEmail: "kevin.nguyen@example.com",
+        declarantPhone: "715-555-0106",
+        serviceDate: "2026-02-12",
+        documentsProvided: "Application for Informal Administration and related opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-02-12"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Kevin T. Nguyen",
+        address: "942 Evergreen Terrace, Stevens Point, WI 54481",
+        email: "kevin.nguyen@example.com",
+        phone: "715-555-0106"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      readinessReady: true,
+      includedForms: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"],
+      excludedForms: ["originalWill", "pr1805"],
+      interestedPersons: ["Kevin T. Nguyen"],
+      excludedInterestedPersons: ["Jennifer L. Nguyen", "Brian K. Nguyen", "Sophia Nguyen"],
+      serviceCounts: { canSignWaiverCount: 1, protectedCount: 0, rawUnansweredWaiverCount: 0, requiresNotice: false },
+      noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
+    }
+  },
+  {
+    id: "batch2-walter-schmidt-will-codicil-minor-beneficiaries",
+    title: "Batch 2: Walter J. Schmidt will and codicil with minor beneficiaries",
+    detail: "Will estate in Sheboygan County with spouse, adult children, codicil gifts to minor grandchildren, and guardian/service handling.",
+    state: {
+      estate: { county: "Sheboygan", estimatedGrossValue: "1350000", estimatedNetValue: "1350000" },
+      pathRouter: {
+        grossValue: "1350000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "no",
+        everyoneAgrees: "yes",
+        publicBenefits: "yes",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Walter J. Schmidt",
+        dateOfBirth: "1944-09-03",
+        dateOfDeath: "2026-05-18",
+        domicileCounty: "Sheboygan County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "588 Lake Shore Drive, Sheboygan, WI 53081"
+      },
+      applicant: {
+        fullName: "Lisa M. Schmidt",
+        capacity: "Surviving spouse; beneficiary under will; nominated personal representative; proposed personal representative",
+        address: "588 Lake Shore Drive, Sheboygan, WI 53081",
+        email: "lisa.schmidt@example.com",
+        phone: "920-555-0107",
+        signatureDate: "2026-06-01"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Lisa M. Schmidt",
+        address: "588 Lake Shore Drive, Sheboygan, WI 53081",
+        email: "lisa.schmidt@example.com",
+        phone: "920-555-0107",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-06-01",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "yes",
+        date: "2017-03-12",
+        hasCodicils: "yes",
+        codicilDates: "2025-01-08",
+        location: "original_accompanies",
+        namedPr: "Lisa M. Schmidt",
+        namedPrNone: false,
+        hasNamedBeneficiaries: "yes",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: false
+      },
+      opening: {
+        waiverStatus: "not_all",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "minor_or_protected_person",
+        peopleWhoCannotSign: "Jacob Keller; Ava Keller",
+        peopleNotFound: "",
+        publicationNotes: "Walter resided in a Wisconsin Veterans Home for approximately four months before death."
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1805: {
+        courthouseCounty: "Sheboygan County Circuit Court",
+        courthouseAddress: "615 North 6th Street, Sheboygan, WI 53081",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "2026-06-30",
+        hearingTime: "9:00 AM",
+        claimDeadline: "2026-10-15",
+        unknownInterestedPersons: "",
+        accommodationPhone: "920-459-3068",
+        checkExactTime: true,
+        newspaperName: "The Sheboygan Press"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was",
+        explanation: "Walter resided in a Wisconsin Veterans Home for approximately four months immediately before death.",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Lisa M. Schmidt",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Lisa M. Schmidt", address: "588 Lake Shore Drive, Sheboygan, WI 53081", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Lisa M. Schmidt" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Eric W. Schmidt", "1207 Timber Ridge Court, Fond du Lac, WI 54935"),
+            scenarioChild("Megan R. Keller", "4516 Harbor Point Road, Manitowoc, WI 54220")
+          ],
+          list: "Eric W. Schmidt; Megan R. Keller",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [
+        { name: "Lisa M. Schmidt", role: "beneficiary", relationship: "Surviving spouse; residue beneficiary under will", address: "588 Lake Shore Drive, Sheboygan, WI 53081", minorDateOfBirth: "", notes: "" },
+        { name: "Eric W. Schmidt", role: "beneficiary", relationship: "Adult son; residue beneficiary under will", address: "1207 Timber Ridge Court, Fond du Lac, WI 54935", minorDateOfBirth: "", notes: "" },
+        { name: "Megan R. Keller", role: "beneficiary", relationship: "Adult daughter; residue beneficiary under will; mother and natural guardian of Jacob and Ava Keller", address: "4516 Harbor Point Road, Manitowoc, WI 54220", minorDateOfBirth: "", notes: "" },
+        { name: "Jacob Keller", role: "beneficiary", relationship: "Minor grandson; codicil beneficiary", address: "4516 Harbor Point Road, Manitowoc, WI 54220", minorDateOfBirth: "2014-02-24", notes: "$25,000 codicil gift." },
+        { name: "Ava Keller", role: "beneficiary", relationship: "Minor granddaughter; codicil beneficiary", address: "4516 Harbor Point Road, Manitowoc, WI 54220", minorDateOfBirth: "2017-08-09", notes: "$25,000 codicil gift." }
+      ],
+      interestedPersons: [
+        scenarioPerson("Lisa M. Schmidt", "Surviving spouse; beneficiary under will; nominated personal representative", "588 Lake Shore Drive, Sheboygan, WI 53081", {
+          roles: { heir: true, beneficiary: true, namedPr: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Eric W. Schmidt", "Adult son; beneficiary under will", "1207 Timber Ridge Court, Fond du Lac, WI 54935", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Megan R. Keller", "Adult daughter; beneficiary under will; natural guardian of minor beneficiaries", "4516 Harbor Point Road, Manitowoc, WI 54220", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Jacob Keller", "Minor beneficiary under will", "4516 Harbor Point Road, Manitowoc, WI 54220", {
+          minorDateOfBirth: "2014-02-24",
+          roles: { beneficiary: true, minor: true, needsGuardian: true },
+          service: { waiverStatus: "not_eligible", locationStatus: "known", protectedPerson: true, needsMailedNotice: true }
+        }),
+        scenarioPerson("Ava Keller", "Minor beneficiary under will", "4516 Harbor Point Road, Manitowoc, WI 54220", {
+          minorDateOfBirth: "2017-08-09",
+          roles: { beneficiary: true, minor: true, needsGuardian: true },
+          service: { waiverStatus: "not_eligible", locationStatus: "known", protectedPerson: true, needsMailedNotice: true }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Lisa M. Schmidt",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Lisa M. Schmidt",
+        declarantCity: "Sheboygan",
+        declarantState: "Wisconsin",
+        declarantAddress: "588 Lake Shore Drive, Sheboygan, WI 53081",
+        declarantEmail: "lisa.schmidt@example.com",
+        declarantPhone: "920-555-0107",
+        serviceDate: "2026-06-01",
+        documentsProvided: "PR-1805 notice and informal probate opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-06-01"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Lisa M. Schmidt",
+        address: "588 Lake Shore Drive, Sheboygan, WI 53081",
+        email: "lisa.schmidt@example.com",
+        phone: "920-555-0107"
+      }
+    },
+    expected: {
+      routeKey: "attorney_review",
+      decisionKey: "notice",
+      readinessReady: true,
+      includedForms: ["originalWill", "pr1801", "pr1805", "pr1806", "pr1807", "pr1808", "pr1810", "pr1817"],
+      excludedForms: ["pr1803", "pr1804"],
+      interestedPersons: ["Lisa M. Schmidt", "Eric W. Schmidt", "Megan R. Keller", "Jacob Keller", "Ava Keller"],
+      serviceCounts: { canSignWaiverCount: 3, protectedCount: 2, mailedNoticeCount: 2, requiresNotice: true },
+      warningsContain: ["guardian/agent service review"],
+      noBlockersFor: ["pr1801", "pr1805", "pr1806", "pr1807", "pr1808", "pr1810", "pr1817"]
+    }
+  },
+  {
+    id: "batch2-margaret-oconnor-will-trust-minor-beneficiaries",
+    title: "Batch 2: Margaret L. O'Connor will with educational trusts and public benefits",
+    detail: "Will estate in Eau Claire County with adult children, educational trusts for minor grandchildren, and estate-recovery facts.",
+    state: {
+      estate: { county: "Eau Claire", estimatedGrossValue: "875000", estimatedNetValue: "875000" },
+      pathRouter: {
+        grossValue: "875000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "no",
+        everyoneAgrees: "yes",
+        publicBenefits: "yes",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Margaret L. O'Connor",
+        dateOfBirth: "1936-04-22",
+        dateOfDeath: "2026-06-02",
+        domicileCounty: "Eau Claire County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "1427 Hickory Lane, Eau Claire, WI 54703"
+      },
+      applicant: {
+        fullName: "Thomas J. O'Connor",
+        capacity: "Adult son; beneficiary under will; nominated personal representative; proposed personal representative",
+        address: "8847 Pine Meadow Drive, Chippewa Falls, WI 54729",
+        email: "thomas.oconnor@example.com",
+        phone: "715-555-0108",
+        signatureDate: "2026-06-16"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Thomas J. O'Connor",
+        address: "8847 Pine Meadow Drive, Chippewa Falls, WI 54729",
+        email: "thomas.oconnor@example.com",
+        phone: "715-555-0108",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-06-16",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "yes",
+        date: "2018-11-03",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "original_accompanies",
+        namedPr: "Thomas J. O'Connor",
+        namedPrNone: false,
+        hasNamedBeneficiaries: "yes",
+        createsTestamentaryTrust: "yes",
+        namedTrustee: "",
+        namedTrusteeNone: true,
+        noWillDiligentInquiry: false
+      },
+      opening: {
+        waiverStatus: "not_all",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "minor_or_protected_person",
+        peopleWhoCannotSign: "Grace Jensen; Samuel Jensen",
+        peopleNotFound: "",
+        publicationNotes: "Potential Medicaid, Family Care, and Community Options Program estate recovery issues."
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1805: {
+        courthouseCounty: "Eau Claire County Circuit Court",
+        courthouseAddress: "721 Oxford Avenue, Eau Claire, WI 54703",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "2026-07-14",
+        hearingTime: "9:00 AM",
+        claimDeadline: "2026-11-02",
+        unknownInterestedPersons: "",
+        accommodationPhone: "715-839-4823",
+        checkExactTime: true,
+        newspaperName: "Leader-Telegram"
+      },
+      benefits: {
+        medicalAssistance: "did",
+        familyCare: "did",
+        communityOptions: "did",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "Margaret received Medicaid-funded long-term care services and participated in Wisconsin Family Care and the Community Options Program.",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Predeceased spouse",
+        livingStatus: "deceased",
+        statusAtDeath: "widowed",
+        communityOptions: "",
+        chronicDisease: "",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Thomas J. O'Connor", address: "8847 Pine Meadow Drive, Chippewa Falls, WI 54729", relationship: "Adult son" },
+        spouse: { exists: "no", name: "" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Thomas J. O'Connor", "8847 Pine Meadow Drive, Chippewa Falls, WI 54729"),
+            scenarioChild("Kathleen M. Jensen", "3704 Valley View Court, Hudson, WI 54016"),
+            scenarioChild("Patrick R. O'Connor", "229 Woodland Avenue, Menomonie, WI 54751")
+          ],
+          list: "Thomas J. O'Connor; Kathleen M. Jensen; Patrick R. O'Connor",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "not_applicable",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [
+        { name: "Thomas J. O'Connor", role: "beneficiary", relationship: "Adult son; farmland beneficiary under will", address: "8847 Pine Meadow Drive, Chippewa Falls, WI 54729", minorDateOfBirth: "", notes: "" },
+        { name: "Kathleen M. Jensen", role: "beneficiary", relationship: "Adult daughter; farmland beneficiary under will; mother and natural guardian of Grace and Samuel Jensen", address: "3704 Valley View Court, Hudson, WI 54016", minorDateOfBirth: "", notes: "" },
+        { name: "Patrick R. O'Connor", role: "beneficiary", relationship: "Adult son; farmland beneficiary under will", address: "229 Woodland Avenue, Menomonie, WI 54751", minorDateOfBirth: "", notes: "" },
+        { name: "Grace Jensen", role: "trust_beneficiary", relationship: "Minor granddaughter; educational trust beneficiary under will", address: "3704 Valley View Court, Hudson, WI 54016", minorDateOfBirth: "2012-10-14", notes: "$20,000 educational trust." },
+        { name: "Samuel Jensen", role: "trust_beneficiary", relationship: "Minor grandson; educational trust beneficiary under will", address: "3704 Valley View Court, Hudson, WI 54016", minorDateOfBirth: "2016-01-28", notes: "$20,000 educational trust." }
+      ],
+      interestedPersons: [
+        scenarioPerson("Thomas J. O'Connor", "Adult son; beneficiary under will; nominated personal representative", "8847 Pine Meadow Drive, Chippewa Falls, WI 54729", {
+          roles: { heir: true, beneficiary: true, namedPr: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Kathleen M. Jensen", "Adult daughter; beneficiary under will; natural guardian of minor trust beneficiaries", "3704 Valley View Court, Hudson, WI 54016", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Patrick R. O'Connor", "Adult son; beneficiary under will", "229 Woodland Avenue, Menomonie, WI 54751", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Grace Jensen", "Minor trust beneficiary under will", "3704 Valley View Court, Hudson, WI 54016", {
+          minorDateOfBirth: "2012-10-14",
+          roles: { beneficiary: true, trustBeneficiary: true, minor: true, needsGuardian: true },
+          service: { waiverStatus: "not_eligible", locationStatus: "known", protectedPerson: true, needsMailedNotice: true }
+        }),
+        scenarioPerson("Samuel Jensen", "Minor trust beneficiary under will", "3704 Valley View Court, Hudson, WI 54016", {
+          minorDateOfBirth: "2016-01-28",
+          roles: { beneficiary: true, trustBeneficiary: true, minor: true, needsGuardian: true },
+          service: { waiverStatus: "not_eligible", locationStatus: "known", protectedPerson: true, needsMailedNotice: true }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Thomas J. O'Connor",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "Educational trusts for Grace Jensen and Samuel Jensen",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Thomas J. O'Connor",
+        declarantCity: "Chippewa Falls",
+        declarantState: "Wisconsin",
+        declarantAddress: "8847 Pine Meadow Drive, Chippewa Falls, WI 54729",
+        declarantEmail: "thomas.oconnor@example.com",
+        declarantPhone: "715-555-0108",
+        serviceDate: "2026-06-16",
+        documentsProvided: "PR-1805 notice and informal probate opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-06-16"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Thomas J. O'Connor",
+        address: "8847 Pine Meadow Drive, Chippewa Falls, WI 54729",
+        email: "thomas.oconnor@example.com",
+        phone: "715-555-0108"
+      }
+    },
+    expected: {
+      routeKey: "attorney_review",
+      decisionKey: "notice",
+      readinessReady: true,
+      includedForms: ["originalWill", "pr1801", "pr1805", "pr1806", "pr1807", "pr1808", "pr1810", "pr1817"],
+      excludedForms: ["pr1803", "pr1804"],
+      interestedPersons: ["Thomas J. O'Connor", "Kathleen M. Jensen", "Patrick R. O'Connor", "Grace Jensen", "Samuel Jensen"],
+      serviceCounts: { canSignWaiverCount: 3, protectedCount: 2, mailedNoticeCount: 2, requiresNotice: true },
+      warningsContain: ["guardian/agent service review"],
+      noBlockersFor: ["pr1801", "pr1805", "pr1806", "pr1807", "pr1808", "pr1810", "pr1817"]
+    }
+  },
+  {
+    id: "batch2-dennis-kowalski-no-will-adult-heirs",
+    title: "Batch 2: Dennis R. Kowalski no will with adult heirs and potential minor descendant",
+    detail: "No-will estate in Marathon County where spouse and adult children can waive; minor grandson is not active because his parent survives.",
+    state: {
+      estate: { county: "Marathon", estimatedGrossValue: "699000", estimatedNetValue: "699000" },
+      pathRouter: {
+        grossValue: "699000",
+        hasRealEstate: "yes",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "no",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Dennis R. Kowalski",
+        dateOfBirth: "1955-12-11",
+        dateOfDeath: "2026-07-09",
+        domicileCounty: "Marathon County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "3227 Birchwood Trail, Wausau, WI 54401"
+      },
+      applicant: {
+        fullName: "Laura M. Kowalski",
+        capacity: "Surviving spouse; heir; proposed personal representative",
+        address: "3227 Birchwood Trail, Wausau, WI 54401",
+        email: "laura.kowalski@example.com",
+        phone: "715-555-0109",
+        signatureDate: "2026-07-20"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Laura M. Kowalski",
+        address: "3227 Birchwood Trail, Wausau, WI 54401",
+        email: "laura.kowalski@example.com",
+        phone: "715-555-0109",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-07-20",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "no",
+        date: "",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "",
+        namedPr: "",
+        namedPrNone: true,
+        hasNamedBeneficiaries: "no",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: true
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: "",
+        publicationNotes: "Minor grandson Ethan D. Kowalski is not expected to inherit because his father, Ryan D. Kowalski, survives Dennis."
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1804: {
+        courthouseCounty: "Marathon County Circuit Court",
+        courthouseAddress: "500 Forest Street, Wausau, WI 54403",
+        room: "Register in Probate",
+        claimDeadline: "2026-11-16",
+        newspaperName: "Wausau Daily Herald"
+      },
+      notice1805: {
+        courthouseCounty: "Marathon County Circuit Court",
+        courthouseAddress: "500 Forest Street, Wausau, WI 54403",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "",
+        hearingTime: "",
+        claimDeadline: "2026-11-16",
+        unknownInterestedPersons: "",
+        accommodationPhone: "715-261-1260",
+        checkExactTime: true,
+        newspaperName: "Wausau Daily Herald"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Laura M. Kowalski",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Laura M. Kowalski", address: "3227 Birchwood Trail, Wausau, WI 54401", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Laura M. Kowalski" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Ryan D. Kowalski", "4116 Timber Creek Road, Stevens Point, WI 54482"),
+            scenarioChild("Nicole A. Kowalski", "2104 Prairie View Lane, Minneapolis, MN 55416")
+          ],
+          list: "Ryan D. Kowalski; Nicole A. Kowalski",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [],
+      interestedPersons: [
+        scenarioPerson("Laura M. Kowalski", "Surviving spouse; heir; proposed personal representative", "3227 Birchwood Trail, Wausau, WI 54401", {
+          roles: { heir: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Laura M. Kowalski",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Laura M. Kowalski",
+        declarantCity: "Wausau",
+        declarantState: "Wisconsin",
+        declarantAddress: "3227 Birchwood Trail, Wausau, WI 54401",
+        declarantEmail: "laura.kowalski@example.com",
+        declarantPhone: "715-555-0109",
+        serviceDate: "2026-07-20",
+        documentsProvided: "Application for Informal Administration and related opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-07-20"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Laura M. Kowalski",
+        address: "3227 Birchwood Trail, Wausau, WI 54401",
+        email: "laura.kowalski@example.com",
+        phone: "715-555-0109"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      readinessReady: true,
+      includedForms: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"],
+      excludedForms: ["originalWill", "pr1805"],
+      interestedPersons: ["Laura M. Kowalski"],
+      excludedInterestedPersons: ["Ryan D. Kowalski", "Nicole A. Kowalski", "Ethan D. Kowalski"],
+      serviceCounts: { canSignWaiverCount: 1, protectedCount: 0, rawUnansweredWaiverCount: 0, requiresNotice: false },
+      noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
+    }
+  },
+  {
+    id: "batch2-james-miller-simple-will-waiver",
+    title: "Batch 2: James R. Miller simple will with spouse and adult children",
+    detail: "Will estate in Rock County with spouse nominated as PR, adult children beneficiaries, and all waivers expected.",
+    state: {
+      estate: { county: "Rock", estimatedGrossValue: "145000", estimatedNetValue: "145000" },
+      pathRouter: {
+        grossValue: "145000",
+        hasRealEstate: "no",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "no",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "James R. Miller",
+        dateOfBirth: "1950-03-15",
+        dateOfDeath: "2026-05-10",
+        domicileCounty: "Rock County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "115 Cedar Street, Janesville, WI 53545"
+      },
+      applicant: {
+        fullName: "Linda K. Miller",
+        capacity: "Surviving spouse; beneficiary under will; nominated personal representative; proposed personal representative",
+        address: "115 Cedar Street, Janesville, WI 53545",
+        email: "linda.miller@example.com",
+        phone: "608-555-0110",
+        signatureDate: "2026-05-22"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Linda K. Miller",
+        address: "115 Cedar Street, Janesville, WI 53545",
+        email: "linda.miller@example.com",
+        phone: "608-555-0110",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-05-22",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "yes",
+        date: "2019-07-01",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "original_accompanies",
+        namedPr: "Linda K. Miller",
+        namedPrNone: false,
+        hasNamedBeneficiaries: "yes",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: false
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: ""
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1804: {
+        courthouseCounty: "Rock County Circuit Court",
+        courthouseAddress: "51 South Main Street, Janesville, WI 53545",
+        room: "Register in Probate",
+        claimDeadline: "2026-09-15",
+        newspaperName: "Janesville Gazette"
+      },
+      notice1805: {
+        courthouseCounty: "Rock County Circuit Court",
+        courthouseAddress: "51 South Main Street, Janesville, WI 53545",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "",
+        hearingTime: "",
+        claimDeadline: "2026-09-15",
+        unknownInterestedPersons: "",
+        accommodationPhone: "608-743-2217",
+        checkExactTime: true,
+        newspaperName: "Janesville Gazette"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Linda K. Miller",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Linda K. Miller", address: "115 Cedar Street, Janesville, WI 53545", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Linda K. Miller" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("David J. Miller", "402 Maple Avenue, Beloit, WI 53511"),
+            scenarioChild("Sarah M. Miller", "88 Birch Lane, Madison, WI 53703")
+          ],
+          list: "David J. Miller; Sarah M. Miller",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [
+        { name: "Linda K. Miller", role: "beneficiary", relationship: "Surviving spouse; beneficiary under will", address: "115 Cedar Street, Janesville, WI 53545", minorDateOfBirth: "", notes: "" },
+        { name: "David J. Miller", role: "beneficiary", relationship: "Adult son; beneficiary under will", address: "402 Maple Avenue, Beloit, WI 53511", minorDateOfBirth: "", notes: "" },
+        { name: "Sarah M. Miller", role: "beneficiary", relationship: "Adult daughter; beneficiary under will", address: "88 Birch Lane, Madison, WI 53703", minorDateOfBirth: "", notes: "" }
+      ],
+      interestedPersons: [
+        scenarioPerson("Linda K. Miller", "Surviving spouse; beneficiary under will; nominated personal representative", "115 Cedar Street, Janesville, WI 53545", {
+          roles: { heir: true, beneficiary: true, namedPr: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("David J. Miller", "Adult son; beneficiary under will", "402 Maple Avenue, Beloit, WI 53511", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Sarah M. Miller", "Adult daughter; beneficiary under will", "88 Birch Lane, Madison, WI 53703", {
+          roles: { heir: true, beneficiary: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Linda K. Miller",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Linda K. Miller",
+        declarantCity: "Janesville",
+        declarantState: "Wisconsin",
+        declarantAddress: "115 Cedar Street, Janesville, WI 53545",
+        declarantEmail: "linda.miller@example.com",
+        declarantPhone: "608-555-0110",
+        serviceDate: "2026-05-22",
+        documentsProvided: "Application for Informal Administration and related opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-05-22"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Linda K. Miller",
+        address: "115 Cedar Street, Janesville, WI 53545",
+        email: "linda.miller@example.com",
+        phone: "608-555-0110"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      readinessReady: true,
+      includedForms: ["originalWill", "pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"],
+      excludedForms: ["pr1805"],
+      interestedPersons: ["Linda K. Miller", "David J. Miller", "Sarah M. Miller"],
+      serviceCounts: { canSignWaiverCount: 3, rawUnansweredWaiverCount: 0, requiresNotice: false },
+      noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
+    }
+  },
+  {
+    id: "batch2-mary-nelson-no-will-waiver",
+    title: "Batch 2: Mary A. Nelson no will with spouse and adult daughter",
+    detail: "No-will estate in Douglas County above the affidavit threshold, with surviving spouse and adult child waivers expected.",
+    state: {
+      estate: { county: "Douglas", estimatedGrossValue: "75000", estimatedNetValue: "75000" },
+      pathRouter: {
+        grossValue: "75000",
+        hasRealEstate: "no",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "no",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Mary A. Nelson",
+        dateOfBirth: "1948-01-05",
+        dateOfDeath: "2026-06-01",
+        domicileCounty: "Douglas County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "101 Pine Street, Superior, WI 54880"
+      },
+      applicant: {
+        fullName: "Robert L. Nelson",
+        capacity: "Surviving spouse; heir; proposed personal representative",
+        address: "101 Pine Street, Superior, WI 54880",
+        email: "robert.nelson@example.com",
+        phone: "715-555-0111",
+        signatureDate: "2026-06-12"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Robert L. Nelson",
+        address: "101 Pine Street, Superior, WI 54880",
+        email: "robert.nelson@example.com",
+        phone: "715-555-0111",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-06-12",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "no",
+        date: "",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "",
+        namedPr: "",
+        namedPrNone: true,
+        hasNamedBeneficiaries: "no",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: true
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: ""
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1804: {
+        courthouseCounty: "Douglas County Circuit Court",
+        courthouseAddress: "1313 Belknap Street, Superior, WI 54880",
+        room: "Register in Probate",
+        claimDeadline: "2026-10-05",
+        newspaperName: "Superior Telegram"
+      },
+      notice1805: {
+        courthouseCounty: "Douglas County Circuit Court",
+        courthouseAddress: "1313 Belknap Street, Superior, WI 54880",
+        room: "Register in Probate",
+        registrarName: "Probate Registrar",
+        hearingDate: "",
+        hearingTime: "",
+        claimDeadline: "2026-10-05",
+        unknownInterestedPersons: "",
+        accommodationPhone: "715-395-1341",
+        checkExactTime: true,
+        newspaperName: "Superior Telegram"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Robert L. Nelson",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Robert L. Nelson", address: "101 Pine Street, Superior, WI 54880", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Robert L. Nelson" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Jennifer Nelson", "500 Oak Avenue, Duluth, MN 55802")
+          ],
+          list: "Jennifer Nelson",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [],
+      interestedPersons: [
+        scenarioPerson("Robert L. Nelson", "Surviving spouse; heir; proposed personal representative", "101 Pine Street, Superior, WI 54880", {
+          roles: { heir: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        }),
+        scenarioPerson("Jennifer Nelson", "Child/descendant; heir", "500 Oak Avenue, Duluth, MN 55802", {
+          roles: { heir: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      requests: {
+        domiciliaryLettersTo: "Robert L. Nelson",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Robert L. Nelson",
+        declarantCity: "Superior",
+        declarantState: "Wisconsin",
+        declarantAddress: "101 Pine Street, Superior, WI 54880",
+        declarantEmail: "robert.nelson@example.com",
+        declarantPhone: "715-555-0111",
+        serviceDate: "2026-06-12",
+        documentsProvided: "Application for Informal Administration and related opening documents",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-06-12"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Robert L. Nelson",
+        address: "101 Pine Street, Superior, WI 54880",
+        email: "robert.nelson@example.com",
+        phone: "715-555-0111"
+      }
+    },
+    expected: {
+      routeKey: "informal_probate",
+      decisionKey: "waiver",
+      readinessReady: true,
+      includedForms: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"],
+      excludedForms: ["originalWill", "pr1805"],
+      interestedPersons: ["Robert L. Nelson"],
+      excludedInterestedPersons: ["Jennifer Nelson"],
+      serviceCounts: { canSignWaiverCount: 1, rawUnansweredWaiverCount: 0, requiresNotice: false },
+      noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
+    }
+  },
+  {
+    id: "batch2-thomas-baker-transfer-affidavit",
+    title: "Batch 2: Thomas E. Baker no will under $50,000",
+    detail: "No-will Barron County estate below the Transfer by Affidavit threshold, with spouse and adult son known and no disputes.",
+    state: {
+      estate: { county: "Barron", estimatedGrossValue: "36888", estimatedNetValue: "36888" },
+      pathRouter: {
+        grossValue: "36888",
+        hasRealEstate: "no",
+        allInterestedKnown: "yes",
+        allAdultsCapable: "yes",
+        everyoneAgrees: "yes",
+        publicBenefits: "no",
+        creditorDispute: "no",
+        formalConcern: "no"
+      },
+      decedent: {
+        fullName: "Thomas E. Baker",
+        dateOfBirth: "1957-08-14",
+        dateOfDeath: "2026-07-18",
+        domicileCounty: "Barron County",
+        domicileState: "Wisconsin",
+        lastMailingAddress: "221 Maple Street, Rice Lake, WI 54868"
+      },
+      applicant: {
+        fullName: "Susan M. Baker",
+        capacity: "Surviving spouse; heir; proposed personal representative",
+        address: "221 Maple Street, Rice Lake, WI 54868",
+        email: "susan.baker@example.com",
+        phone: "715-555-0112",
+        signatureDate: "2026-08-20"
+      },
+      pr: {
+        sameAsApplicant: true,
+        fullName: "Susan M. Baker",
+        address: "221 Maple Street, Rice Lake, WI 54868",
+        email: "susan.baker@example.com",
+        phone: "715-555-0112",
+        isWisconsinResident: "yes",
+        signatureDate: "2026-08-20",
+        residentAgent: { name: "", address: "", email: "", phone: "", signatureDate: "", barNumber: "" }
+      },
+      will: {
+        exists: "no",
+        date: "",
+        hasCodicils: "no",
+        codicilDates: "",
+        location: "",
+        namedPr: "",
+        namedPrNone: true,
+        hasNamedBeneficiaries: "no",
+        createsTestamentaryTrust: "no",
+        noWillDiligentInquiry: true
+      },
+      opening: {
+        waiverStatus: "all_signed",
+        unknownInterestedPersonsStatus: "none_unknown",
+        noticeReason: "",
+        peopleWhoCannotSign: "",
+        peopleNotFound: ""
+      },
+      otherProceedings: { status: "not_pending", explanation: "" },
+      notice1804: {
+        courthouseCounty: "Barron County Circuit Court",
+        courthouseAddress: "1420 State Hwy 25 North, Barron, WI 54812",
+        room: "Register in Probate",
+        claimDeadline: "2026-12-01",
+        newspaperName: "Barron News-Shield"
+      },
+      benefits: {
+        medicalAssistance: "did_not",
+        familyCare: "did_not",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        institution: "was_not",
+        explanation: "",
+        lackInfo: false
+      },
+      spouse: {
+        everMarried: "yes",
+        fullName: "Susan M. Baker",
+        livingStatus: "living",
+        statusAtDeath: "married",
+        communityOptions: "did_not",
+        chronicDisease: "did_not",
+        seeAttached: false,
+        lackInfo: false
+      },
+      heirship: {
+        informant: { name: "Susan M. Baker", address: "221 Maple Street, Rice Lake, WI 54868", relationship: "Surviving spouse" },
+        spouse: { exists: "yes", name: "Susan M. Baker" },
+        children: {
+          exists: "yes",
+          people: [
+            scenarioChild("Mark T. Baker", "715 Birch Lane, Eau Claire, WI 54701")
+          ],
+          list: "Mark T. Baker",
+          deceasedChildDescendants: "",
+          allOfSurvivingSpouse: "yes",
+          blendedDetails: ""
+        },
+        parents: { exists: "no", names: "" },
+        siblings: { exists: "no", names: "", deceasedSiblingDescendants: "" },
+        survivorship120: { exists: "no", details: "" }
+      },
+      willBeneficiaries: [],
+      interestedPersons: [
+        scenarioPerson("Susan M. Baker", "Surviving spouse; heir; proposed personal representative", "221 Maple Street, Rice Lake, WI 54868", {
+          roles: { heir: true },
+          service: { waiverStatus: "can_sign", locationStatus: "known" }
+        })
+      ],
+      transferAffidavit: {
+        affiantName: "Susan M. Baker",
+        affiantAddress: "221 Maple Street, Rice Lake, WI 54868",
+        affiantEmail: "susan.baker@example.com",
+        affiantPhone: "715-555-0112",
+        affiantRelationship: "Surviving spouse and heir",
+        affiantCapacity: "heir",
+        documentRecipient: "Susan M. Baker",
+        draftedBy: "Susan M. Baker",
+        grossValueConfirmed: "36888",
+        daysSinceDeathConfirmed: "yes",
+        noPendingProbate: "yes",
+        entitledPersonsKnown: "yes",
+        entitledPersonsSummary: "Susan M. Baker, surviving spouse and heir. Mark T. Baker is listed on PR-1806 as a common adult child but is not treated as an intestate heir in this scenario.",
+        spouseSummary: "Susan M. Baker, surviving spouse.",
+        realEstateIncluded: "no",
+        vehicleIncluded: "yes",
+        publicBenefitsFollowup: "no",
+        estateRecoveryNoticeSent: "not_needed",
+        realEstateHeirNoticeComplete: "not_needed",
+        creditorConcern: "no",
+        assets: [
+          { type: "Bank account", holder: "Bank or credit union", description: "Checking account", value: "14250", accountOrIdentifier: "", releaseInstructions: "Release to Susan M. Baker", notes: "" },
+          { type: "Bank account", holder: "Bank or credit union", description: "Savings account", value: "9438", accountOrIdentifier: "", releaseInstructions: "Release to Susan M. Baker", notes: "" },
+          { type: "Vehicle", holder: "Wisconsin DMV", description: "2014 Ford Escape", value: "8700", accountOrIdentifier: "VIN TBD", releaseInstructions: "Retitle to Susan M. Baker", notes: "" },
+          { type: "Personal property", holder: "Estate", description: "Personal property", value: "4500", accountOrIdentifier: "", releaseInstructions: "Release to Susan M. Baker", notes: "" }
+        ]
+      },
+      requests: {
+        domiciliaryLettersTo: "Susan M. Baker",
+        appointTrustee: false,
+        trusteeNames: "",
+        trustName: "",
+        additionalTrusts: false,
+        otherSelected: false,
+        otherText: "",
+        question10OtherSelected: false,
+        question10OtherText: "",
+        interestedPersonsSeeAttached: true
+      },
+      service: {
+        declarantName: "Susan M. Baker",
+        declarantCity: "Rice Lake",
+        declarantState: "Wisconsin",
+        declarantAddress: "221 Maple Street, Rice Lake, WI 54868",
+        declarantEmail: "susan.baker@example.com",
+        declarantPhone: "715-555-0112",
+        serviceDate: "2026-08-20",
+        documentsProvided: "Transfer by Affidavit package",
+        originalOnFile: true,
+        copyAttached: false,
+        method: "Mail",
+        signatureDate: "2026-08-20"
+      },
+      courtDrafts: {
+        prBondType: "none",
+        prBondAmount: "",
+        trusteeBondType: "none",
+        trusteeBondAmount: "",
+        otherFindingsSelected: false,
+        otherFindingsText: "",
+        otherOrdersSelected: false,
+        otherOrdersText: "",
+        lettersOtherText: ""
+      },
+      preparer: {
+        fullName: "Susan M. Baker",
+        address: "221 Maple Street, Rice Lake, WI 54868",
+        email: "susan.baker@example.com",
+        phone: "715-555-0112"
+      }
+    },
+    expected: {
+      routeKey: "transfer_affidavit",
+      decisionKey: "waiver",
+      interestedPersons: ["Susan M. Baker"],
+      excludedInterestedPersons: ["Mark T. Baker"],
+      serviceCounts: { canSignWaiverCount: 1, rawUnansweredWaiverCount: 0, requiresNotice: false },
+      noBlockersFor: ["transferAffidavit"],
+      transferWarningsContain: ["Vehicle transfer"]
+    }
+  },
+  {
     id: "will-all-waivers",
     title: "Will case, all waivers available",
-    detail: "The original will accompanies the application, the named PR is known, and beneficiaries can sign.",
+    detail: "The original will accompanies the application, the named PR is known, and beneficiaries are expected to sign.",
     state: {
       will: {
         exists: "yes",
@@ -11380,12 +14925,17 @@ const testScenarios = [
         children: {
           exists: "yes",
           people: [
-            scenarioChild("Alex Decedent", "2200 West Park Street, Milwaukee, WI 53213")
+            scenarioChild("Alex Decedent", "2200 West Park Street, Milwaukee, WI 53213"),
+            scenarioChild("Jordan Decedent", "", {
+              livingStatus: "deceased",
+              deceasedDate: "2020-02-10",
+              descendants: "Casey Grandchild, 1212 North 4th Street, Milwaukee, WI 53203; Drew Grandchild, 515 West Wisconsin Avenue, Milwaukee, WI 53203"
+            })
           ],
-          list: "Alex Decedent",
-          deceasedChildDescendants: "Casey Grandchild; Drew Grandchild",
+          list: "Alex Decedent; Jordan Decedent - deceased 2/10/2020",
+          deceasedChildDescendants: "",
           allOfSurvivingSpouse: "not_applicable",
-          blendedDetails: "A deceased child left Casey Grandchild and Drew Grandchild."
+          blendedDetails: ""
         }
       },
       interestedPersons: [
@@ -11409,6 +14959,7 @@ const testScenarios = [
       includedForms: ["pr1803", "pr1804", "pr1806"],
       excludedForms: ["pr1805"],
       interestedPersons: ["Alex Decedent", "Casey Grandchild", "Drew Grandchild"],
+      excludedInterestedPersons: ["Jordan Decedent"],
       serviceCounts: { canSignWaiverCount: 3, requiresNotice: false },
       noBlockersFor: ["pr1801", "pr1803", "pr1804", "pr1806", "pr1807", "pr1808", "pr1810"]
     }
@@ -11760,7 +15311,7 @@ const testScenarios = [
   {
     id: "missing-address-waiver-warning",
     title: "Waiver path with missing mailing address",
-    detail: "A signer can sign, but the app should still flag address quality before waivers, notices, or service are trusted.",
+    detail: "A signer is expected to sign, but the app should still flag address quality before waivers, notices, or service are trusted.",
     state: {
       heirship: {
         children: {
@@ -11869,7 +15420,7 @@ function evaluateTestScenario(scenario) {
     const readiness = openingDocumentReadiness();
     const serviceSummary = interestedPersonServiceSummary(data);
     const actualInterestedNames = uniqueScenarioNames([
-      ...(data.interestedPersons || []).filter(hasInterestedPersonContent).map((person) => person.name),
+      ...activeInterestedPersonsForNotice(data).map((person) => person.name),
       ...interestedPersonSuggestions().map((suggestion) => suggestion.name)
     ]);
     const checks = scenarioChecks(scenario.expected || {}, {
@@ -11881,6 +15432,17 @@ function evaluateTestScenario(scenario) {
       serviceSummary,
       actualInterestedNames
     });
+    if (/^batch2-/.test(scenario.id)) {
+      checks.push(...scenarioBatch2FormOutputChecks(data, {
+        decision,
+        route,
+        packetMap,
+        reviews,
+        readiness,
+        serviceSummary,
+        actualInterestedNames
+      }, scenario.expected || {}));
+    }
     return {
       scenario,
       data,
@@ -11896,6 +15458,223 @@ function evaluateTestScenario(scenario) {
       pass: checks.every((check) => check.pass)
     };
   });
+}
+
+function scenarioTextField(values, fieldNumber) {
+  return cleanText(values?.textFields?.[fieldNumber]);
+}
+
+function scenarioCheckboxField(values, fieldNumber) {
+  return Boolean(values?.checkboxFields?.[fieldNumber]);
+}
+
+function scenarioAddOutputCheck(checks, label, pass, expectedValue, actualValue) {
+  checks.push({
+    label,
+    pass: Boolean(pass),
+    expected: expectedValue,
+    actual: actualValue
+  });
+}
+
+function scenarioTextEquals(checks, formLabel, values, fieldNumber, expectedValue, description) {
+  const expected = cleanText(expectedValue);
+  const actual = scenarioTextField(values, fieldNumber);
+  if (!expected) return;
+  scenarioAddOutputCheck(
+    checks,
+    `${formLabel} output carries ${description}`,
+    actual === expected,
+    expected,
+    actual || "(blank)"
+  );
+}
+
+function scenarioTextContains(checks, formLabel, values, fieldNumber, expectedValue, description) {
+  const expected = cleanText(expectedValue);
+  const actual = scenarioTextField(values, fieldNumber);
+  if (!expected) return;
+  scenarioAddOutputCheck(
+    checks,
+    `${formLabel} output includes ${description}`,
+    actual.toLowerCase().includes(expected.toLowerCase()),
+    expected,
+    actual || "(blank)"
+  );
+}
+
+function scenarioCheckboxEquals(checks, formLabel, values, fieldNumber, expectedValue, description) {
+  const actual = scenarioCheckboxField(values, fieldNumber);
+  scenarioAddOutputCheck(
+    checks,
+    `${formLabel} checkbox marks ${description}`,
+    actual === Boolean(expectedValue),
+    String(Boolean(expectedValue)),
+    String(actual)
+  );
+}
+
+function scenarioPacketIncludes(packetMap, key) {
+  return packetMap?.[key]?.status === "included";
+}
+
+function scenarioFirstInterestedPerson(data) {
+  return activeInterestedPersonsForNotice(data)[0] || {};
+}
+
+function scenarioBatch2FormOutputChecks(data, actual, expected = {}) {
+  const checks = [];
+  const pr1801 = pr1801Values(data);
+  const pr1806 = pr1806Values(data);
+  const pr1807 = pr1807Values(data);
+  const pr1808 = pr1808Values(data);
+  const pr1810 = pr1810Values(data);
+  const firstInterested = scenarioFirstInterestedPerson(data);
+  const willExists = data.will?.exists === "yes";
+  const noWill = data.will?.exists === "no";
+  const excludedNames = expected.excludedInterestedPersons || [];
+
+  if (scenarioPacketIncludes(actual.packetMap, "pr1801")) {
+    scenarioTextEquals(checks, "PR-1801", pr1801, 1, cleanText(data.estate?.county).toUpperCase(), "county");
+    scenarioTextEquals(checks, "PR-1801", pr1801, 3, data.decedent?.fullName, "decedent name");
+    scenarioTextEquals(checks, "PR-1801", pr1801, 8, documentDate(data.decedent?.dateOfDeath), "date of death");
+    scenarioTextEquals(checks, "PR-1801", pr1801, 16, moneyText(data.estate?.estimatedGrossValue || data.estate?.estimatedNetValue), "probate-property value");
+    scenarioTextEquals(checks, "PR-1801", pr1801, 72, data.applicant?.fullName, "applicant name");
+    scenarioTextEquals(checks, "PR-1801", pr1801, 78, data.preparer?.fullName, "preparer name");
+    if (willExists) {
+      scenarioTextEquals(checks, "PR-1801", pr1801, 42, documentDate(data.will?.date), "will date");
+      scenarioTextEquals(checks, "PR-1801", pr1801, 50, data.will?.namedPr, "personal representative named in will");
+      scenarioCheckboxEquals(checks, "PR-1801", pr1801, 40, true, "will exists");
+    }
+    if (noWill) {
+      scenarioTextEquals(checks, "PR-1801", pr1801, 55, data.pr?.fullName, "proposed personal representative on no-will path");
+      scenarioCheckboxEquals(checks, "PR-1801", pr1801, 54, true, "no will");
+    }
+    const usesInterestedAttachment = scenarioCheckboxField(pr1801, 56);
+    if (usesInterestedAttachment) {
+      scenarioTextEquals(checks, "PR-1801", pr1801, 57, "See attached", "interested-person attachment reference");
+      scenarioTextEquals(checks, "PR-1801", pr1801, 58, "See attached", "interested-person relationship attachment reference");
+      scenarioTextEquals(checks, "PR-1801", pr1801, 59, "See attached", "interested-person address attachment reference");
+    } else {
+      scenarioTextEquals(checks, "PR-1801", pr1801, 57, firstInterested.name, "first interested person name");
+    }
+    excludedNames.forEach((name) => {
+      const attachmentText = pr1801InterestedAttachmentLines(data).join("\n");
+      scenarioAddOutputCheck(
+        checks,
+        `PR-1801 interested-person attachment excludes ${name}`,
+        !attachmentText.toLowerCase().includes(cleanText(name).toLowerCase()),
+        `${name} absent`,
+        attachmentText || "(no attachment rows)"
+      );
+    });
+  }
+
+  if (scenarioPacketIncludes(actual.packetMap, "pr1803")) {
+    const pr1803 = pr1803Values(data);
+    scenarioTextEquals(checks, "PR-1803", pr1803, 1, cleanText(data.estate?.county).toUpperCase(), "county");
+    scenarioTextEquals(checks, "PR-1803", pr1803, 2, data.decedent?.fullName, "decedent name");
+    scenarioTextEquals(checks, "PR-1803", pr1803, 16, data.pr?.fullName, "proposed personal representative");
+    scenarioTextEquals(checks, "PR-1803", pr1803, 20, firstInterested.name, "first waiver signer");
+    if (willExists) scenarioTextEquals(checks, "PR-1803", pr1803, 7, documentDate(data.will?.date), "will date");
+    if (noWill) scenarioCheckboxEquals(checks, "PR-1803", pr1803, 12, true, "no will");
+    excludedNames.forEach((name) => {
+      const signerText = [20, 27, 34, 41, 48, 55, 62, 69].map((field) => scenarioTextField(pr1803, field)).join("\n");
+      scenarioAddOutputCheck(
+        checks,
+        `PR-1803 signer blocks exclude ${name}`,
+        !signerText.toLowerCase().includes(cleanText(name).toLowerCase()),
+        `${name} absent`,
+        signerText || "(no signer names)"
+      );
+    });
+  }
+
+  if (scenarioPacketIncludes(actual.packetMap, "pr1805")) {
+    const pr1805 = pr1805Values(data);
+    scenarioTextEquals(checks, "PR-1805", pr1805, 1, cleanText(data.estate?.county).toUpperCase(), "county");
+    scenarioTextEquals(checks, "PR-1805", pr1805, 2, data.decedent?.fullName, "decedent name");
+    scenarioTextEquals(checks, "PR-1805", pr1805, 11, data.notice1805?.courthouseCounty || data.estate?.county, "court name");
+    scenarioTextEquals(checks, "PR-1805", pr1805, 15, documentDate(data.notice1805?.hearingDate), "hearing date");
+    scenarioTextEquals(checks, "PR-1805", pr1805, 29, data.notice1805?.newspaperName, "publication newspaper");
+  }
+
+  if (scenarioPacketIncludes(actual.packetMap, "pr1806")) {
+    scenarioTextEquals(checks, "PR-1806", pr1806, 1, cleanText(data.estate?.county).toUpperCase(), "county");
+    scenarioTextEquals(checks, "PR-1806", pr1806, 2, data.decedent?.fullName, "decedent name");
+    scenarioTextEquals(checks, "PR-1806", pr1806, 8, data.heirship?.informant?.name, "heirship informant");
+    scenarioTextContains(checks, "PR-1806", pr1806, 17, data.heirship?.children?.people?.[0]?.name || data.heirship?.children?.list, "child list");
+    scenarioCheckboxEquals(checks, "PR-1806", pr1806, 11, data.heirship?.spouse?.exists === "yes", "surviving spouse yes");
+    scenarioCheckboxEquals(checks, "PR-1806", pr1806, 14, data.heirship?.children?.exists === "yes", "children yes");
+  }
+
+  if (scenarioPacketIncludes(actual.packetMap, "pr1807")) {
+    scenarioTextEquals(checks, "PR-1807", pr1807, 1, cleanText(data.estate?.county).toUpperCase(), "county");
+    scenarioTextEquals(checks, "PR-1807", pr1807, 2, data.decedent?.fullName, "decedent name");
+    scenarioTextEquals(checks, "PR-1807", pr1807, 15, data.pr?.fullName, "personal representative name");
+    scenarioTextEquals(checks, "PR-1807", pr1807, 16, data.pr?.address, "personal representative address");
+  }
+
+  if (scenarioPacketIncludes(actual.packetMap, "pr1808")) {
+    scenarioTextEquals(checks, "PR-1808", pr1808, 1, cleanText(data.estate?.county).toUpperCase(), "county");
+    scenarioTextEquals(checks, "PR-1808", pr1808, 2, data.decedent?.fullName, "decedent name");
+    scenarioTextEquals(checks, "PR-1808", pr1808, 16, data.pr?.fullName, "appointed personal representative");
+    scenarioTextEquals(checks, "PR-1808", pr1808, 26, data.requests?.domiciliaryLettersTo || data.pr?.fullName, "letters recipient");
+    scenarioCheckboxEquals(checks, "PR-1808", pr1808, 6, actual.decision?.key === "notice", "notice given");
+    scenarioCheckboxEquals(checks, "PR-1808", pr1808, 7, actual.decision?.key === "waiver", "notice waived");
+  }
+
+  if (scenarioPacketIncludes(actual.packetMap, "pr1810")) {
+    scenarioTextEquals(checks, "PR-1810", pr1810, 1, cleanText(data.estate?.county).toUpperCase(), "county");
+    scenarioTextEquals(checks, "PR-1810", pr1810, 3, data.decedent?.fullName, "decedent name");
+    scenarioTextEquals(checks, "PR-1810", pr1810, 10, data.requests?.domiciliaryLettersTo || data.pr?.fullName, "personal representative receiving letters");
+    scenarioTextEquals(checks, "PR-1810", pr1810, 14, documentDate(data.decedent?.dateOfDeath), "date of death");
+  }
+
+  if (scenarioPacketIncludes(actual.packetMap, "pr1817")) {
+    const pr1817 = pr1817Values(data);
+    scenarioTextEquals(checks, "PR-1817", pr1817, 1, cleanText(data.estate?.county).toUpperCase(), "county");
+    scenarioTextEquals(checks, "PR-1817", pr1817, 2, data.decedent?.fullName, "decedent name");
+    scenarioTextEquals(checks, "PR-1817", pr1817, 7, data.service?.declarantName, "declarant");
+    scenarioTextEquals(checks, "PR-1817", pr1817, 11, data.service?.documentsProvided, "served documents");
+    excludedNames.forEach((name) => {
+      const recipientText = [15, 16, 17].map((field) => scenarioTextField(pr1817, field)).concat(appendPr1817Attachment ? activeInterestedPersonsForNotice(data).map((person) => person.name) : []).join("\n");
+      scenarioAddOutputCheck(
+        checks,
+        `PR-1817 recipient fields exclude ${name}`,
+        !recipientText.toLowerCase().includes(cleanText(name).toLowerCase()),
+        `${name} absent`,
+        recipientText || "(no recipient names)"
+      );
+    });
+  }
+
+  if (actual.route?.key === "transfer_affidavit") {
+    const readiness = transferAffidavitReadiness(data);
+    scenarioAddOutputCheck(
+      checks,
+      "Transfer by Affidavit output carries gross value",
+      readiness.gross === numberValue(data.estate?.estimatedGrossValue),
+      String(numberValue(data.estate?.estimatedGrossValue)),
+      String(readiness.gross)
+    );
+    scenarioAddOutputCheck(
+      checks,
+      "Transfer by Affidavit output carries asset list",
+      readiness.assets.length > 0,
+      "at least one asset",
+      `${readiness.assets.length} asset(s)`
+    );
+    scenarioAddOutputCheck(
+      checks,
+      "Transfer by Affidavit output carries affiant",
+      transferAffidavitAffiantName(data) === cleanText(data.applicant?.fullName),
+      cleanText(data.applicant?.fullName),
+      transferAffidavitAffiantName(data)
+    );
+  }
+
+  return checks;
 }
 
 function uniqueScenarioNames(names = []) {
@@ -11971,6 +15750,12 @@ function scenarioChecks(expected, actual) {
     const target = normalizedPersonName(name);
     const found = actual.actualInterestedNames.some((actualName) => normalizedPersonName(actualName) === target);
     addCheck(`Interested person carried forward: ${name}`, found, name, actual.actualInterestedNames.join(", "));
+  });
+
+  (expected.excludedInterestedPersons || []).forEach((name) => {
+    const target = normalizedPersonName(name);
+    const found = actual.actualInterestedNames.some((actualName) => normalizedPersonName(actualName) === target);
+    addCheck(`Person not carried solely as interested person: ${name}`, !found, `not included: ${name}`, found ? actual.actualInterestedNames.join(", ") : "not included");
   });
 
   Object.entries(expected.serviceCounts || {}).forEach(([key, value]) => {
@@ -12074,6 +15859,7 @@ function scenarioServiceLabel(key) {
     unknownOrMissingCount: "unknown/missing count",
     protectedCount: "minor/protected count",
     missingAddressCount: "missing-address count",
+    rawUnansweredWaiverCount: "unanswered waiver count",
     requiresNotice: "requires notice"
   };
   return labels[key] || key;
@@ -12202,9 +15988,9 @@ const issueTargetRules = [
   [/Proposed personal representative|proposed PR|personal representative name/i, { step: "applicant", selector: '[data-path="pr.fullName"]' }],
   [/personal representative address|proposed PR address/i, { step: "applicant", selector: '[data-path="pr.address"]' }],
   [/Wisconsin residency/i, { step: "applicant", selector: '[data-path="pr.isWisconsinResident"]' }],
-  [/resident agent name/i, { step: "applicant", selector: '[data-path="pr.residentAgent.name"]' }],
-  [/resident agent address/i, { step: "applicant", selector: '[data-path="pr.residentAgent.address"]' }],
-  [/resident agent phone|resident-agent handling/i, { step: "applicant", selector: '[data-path="pr.residentAgent.phone"]' }],
+  [/resident-agent name|resident agent name/i, { step: "applicant", selector: '[data-path="pr.residentAgent.name"]' }],
+  [/resident-agent address|resident agent address/i, { step: "applicant", selector: '[data-path="pr.residentAgent.address"]' }],
+  [/resident agent phone/i, { step: "applicant", selector: '[data-path="pr.residentAgent.phone"]' }],
   [/left a will|Will date|will date|will path/i, { step: "will", selector: '[data-path="will.exists"]' }],
   [/codicil/i, { step: "will", selector: '[data-path="will.codicilDates"]' }],
   [/Original will status|original will status/i, { step: "will", selector: '[data-path="will.location"]' }],
@@ -12649,15 +16435,18 @@ function wordEfileFormLabels(forms = activePacketForms()) {
 function formProductionTarget(key) {
   const targets = {
     "transfer-affidavit": "Exact PR-1831 PDF/print package plus editable worksheet",
-    pr1801: "Exact statewide form PDF overlay for signed filing plus editable Word working copy",
+    pr1801: "Word/DOCX eFiling copy plus PDF/print copy for public filing and signature records",
     pr1803: "Exact statewide PDF/print waiver set plus editable Word logistics copy",
-    pr1804: "Exact statewide PDF for filing/publication plus editable Word working copy",
-    pr1805: "Exact statewide PDF notice path plus editable Word working copy if county practice requires",
+    pr1804: "Word/DOCX eFiling copy plus PDF/print copy for publication workflow",
+    pr1805: "Word/DOCX eFiling copy plus PDF/print copy for notice/service workflow",
     pr1806: "Signed exact PDF after wet signature plus editable Word working copy",
     pr1807: "Signed exact PDF after wet signature plus editable Word working copy",
     pr1808: "Editable Word court draft plus PDF preview/copy",
-    pr1810: "Editable Word court draft plus PDF preview/copy",
+    pr1810: "PDF eFiling/print copy plus editable working copy for review",
     pr1811: "Signed exact PDF after appointment plus editable Word working copy",
+    pr1814: "Signed exact PDF after accounting review plus editable Word working copy",
+    pr1815: "Signed exact PDF after receipt/release signatures plus editable Word working copy",
+    pr1816: "Signed exact PDF after closing review plus editable Word working copy",
     pr1817: "Signed exact PDF after service plus editable Word working copy"
   };
   return targets[key] || "Confirm official form format";
@@ -12676,10 +16465,10 @@ function officialFormIntegrityRule(key) {
     },
     pr1801: {
       standardForm: "PR-1801",
-      officialOutput: "Exact official PDF overlay or court-approved replica",
+      officialOutput: "Official Word/DOCX eFiling copy plus PDF/print copy for public filing and signature records",
       betaOutput: "DOCX draft plus overlay value map",
       integrityStatus: "overlay-map-started",
-      attorneyFormat: "Signed PDF eFiling copy after wet signature, exact overlay, and legal review",
+      attorneyFormat: "Word/DOCX for Wisconsin attorney eFiling",
       publicFormat: "Print/sign official form packet; editable Word working copy can be offered for corrections",
       note: "Current map identifies values; official PDF template coordinates are still needed."
     },
@@ -12694,19 +16483,19 @@ function officialFormIntegrityRule(key) {
     },
     pr1804: {
       standardForm: "PR-1804",
-      officialOutput: "Exact official PDF for filing/publication",
+      officialOutput: "Official Word/DOCX eFiling copy plus PDF/print publication copy",
       betaOutput: "DOCX notice draft",
       integrityStatus: "overlay-needed",
-      attorneyFormat: "PDF for eFile/publication workflow",
+      attorneyFormat: "Word/DOCX for Wisconsin attorney eFiling",
       publicFormat: "Print/file/publish as county requires",
       note: "Court/county-provided claim deadline and official publication details must not be guessed."
     },
     pr1805: {
       standardForm: "PR-1805",
-      officialOutput: "Exact official PDF notice path form",
+      officialOutput: "Official Word/DOCX eFiling copy plus PDF/print notice path form",
       betaOutput: "DOCX notice draft",
       integrityStatus: "overlay-needed",
-      attorneyFormat: "PDF unless county requests editable notice",
+      attorneyFormat: "Word/DOCX for Wisconsin attorney eFiling",
       publicFormat: "Print/file/serve/publish as county requires",
       note: "Used when the matter cannot open entirely on waivers."
     },
@@ -12739,12 +16528,12 @@ function officialFormIntegrityRule(key) {
     },
     pr1810: {
       standardForm: "PR-1810",
-      officialOutput: "Official court draft in Word/editable format plus optional PDF preview",
+      officialOutput: "Exact official PDF after court issuance/signature",
       betaOutput: "DOCX court draft",
-      integrityStatus: "editable-court-draft",
-      attorneyFormat: "Word/DOCX court-editable draft when required for eFiling or court issuance",
+      integrityStatus: "overlay-needed",
+      attorneyFormat: "PDF for Wisconsin attorney eFiling",
       publicFormat: "Submit for court issuance if local practice accepts; court signs/issues it",
-      note: "Attorneys often need this as Word/editable because the court may issue or edit the letters."
+      note: "Per current project rule, PR-1810 belongs in the PDF eFiling lane even though an editable working draft can still be generated."
     },
     pr1811: {
       standardForm: "PR-1811",
@@ -12754,6 +16543,33 @@ function officialFormIntegrityRule(key) {
       attorneyFormat: "Signed PDF",
       publicFormat: "Print/sign/file after appointment",
       note: "Inventory is a later administration form, not part of the core opening download unless requested."
+    },
+    pr1814: {
+      standardForm: "PR-1814",
+      officialOutput: "Exact official PDF after account/signature review",
+      betaOutput: "Future DOCX/PDF account draft",
+      integrityStatus: "overlay-needed",
+      attorneyFormat: "PDF for Wisconsin attorney eFiling",
+      publicFormat: "Print/sign/file during accounting or closing stage",
+      note: "Later administration form; include in the PDF lane when built."
+    },
+    pr1815: {
+      standardForm: "PR-1815",
+      officialOutput: "Exact official PDF after receipt/release signatures",
+      betaOutput: "Future DOCX/PDF receipt draft",
+      integrityStatus: "overlay-needed",
+      attorneyFormat: "PDF for Wisconsin attorney eFiling",
+      publicFormat: "Print/sign/file during distribution or closing stage",
+      note: "Later administration form; include in the PDF lane when built."
+    },
+    pr1816: {
+      standardForm: "PR-1816",
+      officialOutput: "Exact official PDF after closing review",
+      betaOutput: "Future DOCX/PDF closing draft",
+      integrityStatus: "overlay-needed",
+      attorneyFormat: "PDF for Wisconsin attorney eFiling",
+      publicFormat: "Print/sign/file during closing stage",
+      note: "Later administration form; include in the PDF lane when built."
     },
     pr1817: {
       standardForm: "PR-1817",
@@ -12936,7 +16752,7 @@ function officialFormIntegrityManifestText(data = state) {
 
 function outputReadinessStatus(form) {
   if (!form.included) return { key: "not-in-path", label: "Not in packet", tone: "muted" };
-  if (["pr1808", "pr1810"].includes(form.key)) return { key: "editable-court-draft", label: "Word court draft", tone: "warn" };
+  if (["pr1801", "pr1804", "pr1805", "pr1808"].includes(form.key)) return { key: "word-efile-ready", label: "Word eFile lane", tone: "warn" };
   if (form.key === "pr1801") return { key: "overlay-map-ready", label: "Overlay map started", tone: "warn" };
   if (form.key === "transfer-affidavit") return { key: "template-needed", label: "Official template needed", tone: "bad" };
   return { key: "overlay-needed", label: "Exact PDF overlay needed", tone: "warn" };
@@ -12949,7 +16765,7 @@ function outputReadinessSummary(forms = formPreviewDefinitions()) {
     activeCount: activeForms.length,
     overlayNeeded: statuses.filter((item) => ["overlay-needed", "overlay-map-ready"].includes(item.status.key)).length,
     overlayPilots: statuses.filter((item) => item.status.key === "overlay-map-ready").length,
-    editableDrafts: statuses.filter((item) => item.status.key === "editable-court-draft").length,
+    editableDrafts: statuses.filter((item) => item.status.key === "editable-court-draft" || item.status.key === "word-efile-ready").length,
     templateNeeded: statuses.filter((item) => item.status.key === "template-needed").length,
     statuses
   };
@@ -12961,7 +16777,7 @@ function outputReadinessPanelHtml(forms = formPreviewDefinitions()) {
     [String(summary.activeCount), "active forms", ""],
     [String(summary.overlayNeeded), "PDF overlays needed", summary.overlayNeeded ? "warn" : ""],
     [String(summary.overlayPilots), "overlay pilot", summary.overlayPilots ? "warn" : ""],
-    [String(summary.editableDrafts), "Word court drafts", summary.editableDrafts ? "warn" : ""],
+    [String(summary.editableDrafts), "Word eFile forms", summary.editableDrafts ? "warn" : ""],
     [String(summary.templateNeeded), "official templates needed", summary.templateNeeded ? "bad" : ""]
   ];
   return `
@@ -12970,8 +16786,8 @@ function outputReadinessPanelHtml(forms = formPreviewDefinitions()) {
         <div>
           <p class="eyebrow">Court-reliable output</p>
           <h3>Official-form readiness</h3>
-          <p>Current downloads are beta Word drafts. Production needs signable Word working copies and exact statewide-form PDF filing copies where appropriate.</p>
-          <p class="helper-text">Wet signatures remain part of the workflow. Attorney eFiling should use signed/scanned PDFs for signed documents and Word/DOCX for court-editable drafts when required.</p>
+          <p>Current downloads are beta Word drafts. Production needs the required Word/DOCX eFiling forms and exact PDF filing copies for the forms that belong in the PDF lane.</p>
+          <p class="helper-text">Wet signatures remain part of the workflow. Attorney eFiling uses Word/DOCX for PR-1801, PR-1804, PR-1805, and PR-1808; the other opening and later PR forms are tracked as PDFs.</p>
         </div>
         <span class="badge warn">Beta output</span>
       </div>
@@ -13007,9 +16823,9 @@ function formOutputRule(key) {
     },
     pr1801: {
       current: "DOCX draft",
-      attorney: "PDF target for e-file after review",
+      attorney: "Word/DOCX target for Wisconsin eFiling",
       public: "Print/sign packet",
-      note: "Move to official PDF overlay or exact replica before production."
+      note: "Keep the Word/DOCX eFiling copy and a PDF/print copy for public filing or signature records."
     },
     pr1803: {
       current: "DOCX draft or waiver ZIP",
@@ -13019,13 +16835,13 @@ function formOutputRule(key) {
     },
     pr1804: {
       current: "DOCX draft",
-      attorney: "PDF target for publication/e-file",
+      attorney: "Word/DOCX target for Wisconsin eFiling",
       public: "Print/file/publish as court requires",
       note: "Publication newspaper and claim deadline must be county-verified."
     },
     pr1805: {
       current: "DOCX draft",
-      attorney: "PDF target unless court requests editable notice",
+      attorney: "Word/DOCX target for Wisconsin eFiling",
       public: "Print/file/serve/publish as court requires",
       note: "Use when the case cannot open entirely on waivers."
     },
@@ -13039,25 +16855,43 @@ function formOutputRule(key) {
       current: "DOCX draft",
       attorney: "PDF target for e-file after signature",
       public: "Print/sign packet",
-      note: "Nonresident PR resident-agent handling must be complete before final filing."
+      note: "If the PR is not a Wisconsin resident, include completed resident-agent information before final filing."
     },
     pr1808: {
       current: "DOCX court draft",
-      attorney: "Word/editable court draft review",
+      attorney: "Word/DOCX target for Wisconsin eFiling",
       public: "Usually prepared for court review/signature",
-      note: "Court-official signature/editing makes this a Word/editable-format candidate before production rules are finalized."
+      note: "This belongs in the Word/DOCX eFiling lane."
     },
     pr1810: {
       current: "DOCX court draft",
-      attorney: "Word/editable court draft review",
+      attorney: "PDF target for Wisconsin eFiling",
       public: "Court-issued letters after appointment",
-      note: "Flagged from project note and eFiling rules: because court editing/signature may be needed, PR-1810 should stay Word/editable for attorney e-file review."
+      note: "Per current project rule, this belongs in the PDF eFiling lane."
     },
     pr1811: {
       current: "DOCX draft",
       attorney: "PDF target for e-file after signature",
       public: "Print/sign/file after appointment",
       note: "Inventory is usually post-appointment, not the core opening packet."
+    },
+    pr1814: {
+      current: "Future DOCX/PDF draft",
+      attorney: "PDF target for e-file after review/signature",
+      public: "Print/sign/file during accounting or closing stage",
+      note: "Estate account belongs in the later administration PDF lane."
+    },
+    pr1815: {
+      current: "Future DOCX/PDF draft",
+      attorney: "PDF target for e-file after receipt/release signatures",
+      public: "Print/sign/file during distribution or closing stage",
+      note: "Receipt/release belongs in the later administration PDF lane."
+    },
+    pr1816: {
+      current: "Future DOCX/PDF draft",
+      attorney: "PDF target for e-file after closing signature",
+      public: "Print/sign/file during closing stage",
+      note: "Closing certificate belongs in the later administration PDF lane."
     },
     pr1817: {
       current: "DOCX draft",
@@ -13115,9 +16949,9 @@ function outputManifestText(data = state) {
       `Audience: ${data.payment?.exportAudience === "attorney" ? "Attorney e-file review" : "Public print review"}`,
       "",
       "Production rule",
-      "Wisconsin statewide forms must keep the required layout/margins. Users should get signable Word working copies and, once exact overlays/templates are available, official PDF filing copies. Attorney eFiling packages should account for wet signatures: signed documents generally become signed/scanned PDFs, while court-editable drafts may need Word/DOCX.",
+      "Wisconsin statewide forms must keep the required layout/margins. Attorney eFiling should organize PR-1801, PR-1804, PR-1805, and PR-1808 as Word/DOCX documents. The other opening documents and later PR-1811, PR-1814, PR-1815, PR-1816, and PR-1817 should be organized as PDFs.",
       STANDARD_FORM_INTEGRITY_POLICY.rule,
-      "Product rule: users should be able to access both an editable Word working copy and a PDF/exact official filing copy when available. Per-form eFiling defaults must remain configurable until Wisconsin form-by-form requirements are confirmed.",
+      "Product rule: public users should still be able to print/sign a paper packet, while attorney users get a clear Word/PDF eFiling split.",
       "",
       "Readiness summary",
       `Active forms: ${summary.activeCount}`,
@@ -13151,7 +16985,7 @@ function efilingFormatConfigText(data = state) {
       `Generated: ${documentDate(new Date().toISOString().slice(0, 10))}`,
       "",
       "Working rule",
-      "Documents that need a person's signature should be wet-signed before paper filing or scanned/flattened for attorney eFiling. Court-editable drafts may need Word/DOCX. This configuration is intentionally editable until the final Wisconsin form-by-form eFiling list is confirmed.",
+      "Attorney eFiling Word/DOCX lane: PR-1801, PR-1804, PR-1805, PR-1808. PDF lane: PR-1803, PR-1806, PR-1807, PR-1810, PR-1811, PR-1814, PR-1815, PR-1816, PR-1817, and PR-1831 unless later county-specific review says otherwise. Wet signatures still matter before paper filing and for any signed/scanned PDFs.",
       "",
       rows.join("\n\n") || "(No active forms.)"
     ].join("\n");
@@ -13177,7 +17011,7 @@ function signingPackageReadmeText(data = state) {
       signatureRows.join("\n") || "- No active forms.",
       "",
       "Practical filing note",
-      "PR-1808 and PR-1810 are included as court/registrar drafts in the opening packet. The court may complete, sign, issue, or return them according to local practice. Later forms such as PR-1811 Inventory should usually be handled after domiciliary letters issue."
+      "PR-1808 and PR-1810 are included as court/registrar documents in the opening packet. For attorney eFiling, PR-1808 belongs in the Word/DOCX lane and PR-1810 belongs in the PDF lane. Later forms such as PR-1811 Inventory should usually be handled after domiciliary letters issue."
     ].join("\n");
   });
 }
@@ -13201,9 +17035,138 @@ function attorneyEfilePackageReadmeText(data = state) {
       wordDrafts.length ? wordDrafts.map((label) => `- ${label}`).join("\n") : "- None in the active packet.",
       "",
       "Current prototype limitation",
-      "The app does not yet convert wet-signed forms into signed PDFs. Production should create exact official PDFs for filing copies and keep Word/DOCX only where the court or eFiling workflow requires editable drafts."
+      "The app does not yet convert wet-signed forms into signed PDFs. Production should create exact official PDFs for PDF-lane filing copies and keep Word/DOCX output for PR-1801, PR-1804, PR-1805, and PR-1808."
     ].join("\n");
   });
+}
+
+function openingPacketIndexText(data = state) {
+  return withTemporaryState(data, () => {
+    const forms = activePacketForms(data).filter((form) => form.key !== "pr1811");
+    const readiness = openingDocumentReadiness();
+    const signatures = signatureTrackingSummary(data);
+    const launchGate = launchReleaseGateStatus("informal_probate", data);
+    return [
+      "Opening Packet Index",
+      `Generated: ${documentDate(new Date().toISOString().slice(0, 10))}`,
+      `Estate: ${cleanText(data.decedent?.fullName) || "(not set)"}`,
+      `County: ${cleanText(data.estate?.county) || "(not set)"}`,
+      `Opening path: ${openingPathDecision(data).title}`,
+      `Package mode: ${launchGate.label}`,
+      "",
+      "Folder map",
+      "01-opening-documents-print-sign-file: opening documents for public print/sign/file workflow.",
+      "02-attorney-efile-format-notes: Word/PDF handling notes for attorney review and eFiling.",
+      "03-later-after-domiciliary-letters: inventory/accounting/closing work that usually happens after letters issue.",
+      "04-developer-output-maps: beta mapping aids for exact official-form output work.",
+      "",
+      "Included opening forms",
+      forms.length ? forms.map((form, index) => {
+        const format = formFormatConfig(form.key);
+        return `${index + 1}. ${format.formNumber} ${form.name} - ${format.signatureWorkflow}`;
+      }).join("\n") : "- No opening forms are currently included.",
+      "",
+      "Signatures",
+      `Required signer tasks: ${signatures.required}`,
+      signatures.rows.map((row) => `- ${row.formNumber}: ${row.signer} (${row.role})`).join("\n") || "- No signature tasks detected.",
+      "",
+      "Readiness",
+      `Opening packet ready: ${readiness.ready ? "Yes" : "No"}`,
+      readiness.blockers.length ? readiness.blockers.map((item) => `- Must fix: ${item}`).join("\n") : "- No must-fix readiness blockers.",
+      readiness.reviewWarnings.length ? readiness.reviewWarnings.map((item) => `- Review: ${item}`).join("\n") : "- No extra review warnings.",
+      "",
+      "Important",
+      LEGAL_DISCLAIMER_FULL
+    ].join("\n");
+  });
+}
+
+function publicPaperFilingChecklistText(data = state) {
+  return withTemporaryState(data, () => {
+    const result = openingPacketResults(data);
+    const forms = result.formDetails.filter((item) => item.status === "included" && item.key !== "pr1811");
+    const waiverPath = openingPathDecision(data).key === "waiver";
+    return [
+      "Public Print, Sign, and File Checklist",
+      "",
+      "1. Print the opening documents in this folder.",
+      "2. Review every page before signing.",
+      "3. Collect wet signatures for the forms and waivers that require party signatures.",
+      waiverPath
+        ? "4. Collect PR-1803 waiver signatures from every eligible interested person before relying on the waiver path."
+        : "4. Follow the PR-1805 notice/service/publication path if the matter cannot open entirely on waivers.",
+      "5. Take or mail the packet to the Register in Probate/probate office for the selected county.",
+      "6. Keep proof of publication, proof of mailing/service, and signed originals or copies as needed.",
+      "7. After the court issues domiciliary letters, move to inventory and administration tasks.",
+      "",
+      "Forms currently included",
+      forms.map((item) => `- ${packetFormLabel(item)}: ${item.reason}`).join("\n") || "- None.",
+      "",
+      "Court/county note",
+      "The Register in Probate may supply or adjust case number, claim deadline, hearing details, publication details, or local filing instructions."
+    ].join("\n");
+  });
+}
+
+function attorneyEfilePrepChecklistText(data = state) {
+  return withTemporaryState(data, () => {
+    const forms = activePacketForms(data).filter((form) => form.key !== "pr1811");
+    const signedPdf = signedPdfFormLabels(forms);
+    const wordDrafts = wordEfileFormLabels(forms);
+    return [
+      "Attorney eFiling Prep Checklist",
+      "",
+      "Working rule",
+      "Wet signatures still matter. Attorney eFiling should use Word/DOCX for PR-1801, PR-1804, PR-1805, and PR-1808; the other opening and later PR forms are tracked in the PDF lane.",
+      "",
+      "Signed/scanned PDF lane",
+      signedPdf.length ? signedPdf.map((label) => `- ${label}`).join("\n") : "- None in the active opening packet.",
+      "",
+      "Word/DOCX court-editable lane",
+      wordDrafts.length ? wordDrafts.map((label) => `- ${label}`).join("\n") : "- None in the active opening packet.",
+      "",
+      "Review before filing",
+      "- Confirm current county eFiling requirements.",
+      "- Confirm each statewide form is the current official version.",
+      "- Confirm signed PDFs are legible, complete, and flattened before upload.",
+      "- Confirm PR-1801, PR-1804, PR-1805, and PR-1808 are in the Word/DOCX lane and PR-1810 is in the PDF lane."
+    ].join("\n");
+  });
+}
+
+function laterAdministrationChecklistText(data = state) {
+  return withTemporaryState(data, () => [
+    "Later Administration Checklist",
+    "",
+    "Use this after domiciliary letters issue.",
+    "",
+    "- Track the date letters are issued.",
+    "- Calendar inventory deadline and creditor-claim deadline.",
+    "- Prepare PR-1811 Inventory after appointment.",
+    "- Track receipts, releases, distributions, expenses, and claims.",
+    "- Reconcile inventory and estate account before closing.",
+    "- Do not mix later inventory/accounting work into the opening packet unless the court or attorney workflow specifically requires it."
+  ].join("\n"));
+}
+
+function betaDownloadFeedbackRequestText(data = state) {
+  return withTemporaryState(data, () => [
+    "Beta Feedback Request",
+    "",
+    "Thank you for testing this Wisconsin probate forms prototype.",
+    "",
+    "After reviewing the downloaded packet, please return to the app and submit feedback from View Forms / beta account.",
+    "",
+    "Most helpful feedback",
+    "- Which packet decision looked right or wrong?",
+    "- Which interested person was included, excluded, or treated incorrectly?",
+    "- Which generated form field was wrong, missing, cramped, or unclear?",
+    "- Which filing/signing instruction would confuse a public user?",
+    "- Would this case need attorney review before filing?",
+    "",
+    `Estate tested: ${cleanText(data.decedent?.fullName) || "(not set)"}`,
+    `Opening path: ${openingPathDecision(data).title}`
+  ].join("\n"));
 }
 
 function signatureRequirementId(formKey, signer, role = "") {
@@ -13232,7 +17195,7 @@ function signatureRequirementRows(data = state) {
       add("pr1801", "PR-1801", "Application for Informal Administration", data.applicant?.fullName, "Applicant", "Wet-sign before paper filing or scan/flatten for attorney eFiling.");
     }
     if (activeKeys.has("pr1803")) {
-      const signers = (data.interestedPersons || []).filter(hasInterestedPersonContent);
+      const signers = activeInterestedPersonsForNotice(data);
       if (data.waiver?.signatureMode === "individual") {
         signers.forEach((person, index) => add("pr1803", "PR-1803", "Waiver and Consent", person.name, "Interested person waiver signer", "Individual waiver should be wet-signed and returned.", { id: signatureRequirementId("pr1803", person.name || `signer-${index + 1}`, "individual-waiver") }));
       } else {
@@ -13398,7 +17361,7 @@ function outputFormatMatrixHtml(forms = formPreviewDefinitions()) {
     ? "attorney"
     : "public";
   const audienceText = audience === "attorney"
-    ? "Attorney e-file mode: expect a mixed package. Wet-signed documents generally become signed/scanned PDFs; court-editable drafts such as PR-1808/PR-1810 can stay Word/DOCX when required."
+    ? "Attorney e-file mode: PR-1801, PR-1804, PR-1805, and PR-1808 go in the Word/DOCX lane; the other opening and later PR forms go in the PDF lane."
     : "Public print mode: users should get editable Word working copies and, when exact official output is available, PDF/print filing copies for signature.";
   return `
     <div class="output-format-panel">
@@ -13417,7 +17380,7 @@ function outputFormatMatrixHtml(forms = formPreviewDefinitions()) {
           const dual = formDualOutputRule(form.key);
           const format = formFormatConfig(form.key);
           return `
-            <div class="format-row ${["pr1808", "pr1810"].includes(form.key) ? "highlight" : ""}">
+            <div class="format-row ${["pr1801", "pr1804", "pr1805", "pr1808"].includes(form.key) ? "highlight" : ""}">
               <strong>${escapeHtml(form.title)}</strong>
               <span>${escapeHtml(efileDefaultLabel(format.efileDefault))}</span>
               <span>${escapeHtml(format.signatureWorkflow)}</span>
@@ -13729,7 +17692,7 @@ function checklistGroups() {
     {
       title: "Choose path",
       items: [
-        "Answer whether every interested person can sign PR-1803",
+        "Answer whether every interested person is expected to sign PR-1803",
         "Confirm whether the decedent had a will",
         "Then the app will show the waiver-path or PR-1805-path packet"
       ]
@@ -14046,6 +18009,8 @@ async function buildTransferAffidavitZip(data = state) {
   const slug = estateSlug();
   await addBlobToZip(zip, "01-affidavit-package", `transfer-by-affidavit-draft-${slug}.docx`, await buildTransferAffidavitDocx(data));
   zip.file("00-read-me.txt", transferAffidavitReadmeText(data));
+  zip.file("00-launch-gate-report.txt", launchReleaseGateText("transfer_affidavit", data));
+  zip.file("00-beta-feedback-request.txt", betaDownloadFeedbackRequestText(data));
   zip.file("00-legal-disclaimer.txt", LEGAL_DISCLAIMER_FULL);
   zip.file("00-output-format-manifest.txt", outputManifestText(data));
   zip.file("00-official-form-integrity-manifest.txt", officialFormIntegrityManifestText(data));
@@ -14118,6 +18083,7 @@ async function buildInformationSummaryZip(data = state) {
   zip.file("signature-tracking.txt", signatureTrackingText(data));
   zip.file("secure-delivery-manifest.txt", secureDeliveryManifestText(data));
   zip.file("production-launch-handoff.txt", productionLaunchHandoffText(data));
+  zip.file("launch-gate-report.txt", launchReleaseGateText(documentProductKey(), data));
   zip.file("output-format-manifest.txt", outputManifestText(data));
   zip.file("official-form-integrity-manifest.txt", officialFormIntegrityManifestText(data));
   zip.file("official-template-vault-manifest.txt", officialTemplateVaultManifestText(data));
@@ -14153,6 +18119,7 @@ async function buildAttorneyHandoffZip(data = state) {
   zip.file("signature-tracking.txt", signatureTrackingText(data));
   zip.file("secure-delivery-manifest.txt", secureDeliveryManifestText(data));
   zip.file("production-launch-handoff.txt", productionLaunchHandoffText(data));
+  zip.file("launch-gate-report.txt", launchReleaseGateText(documentProductKey(), data));
   zip.file("inventory-snapshot.txt", withTemporaryState(data, () => inventorySummaryText()));
   if (data.attorneyHandoff.includeCaseData !== false) {
     zip.file("case-data.json", JSON.stringify(data, null, 2));
@@ -14188,6 +18155,9 @@ async function buildOpeningPacketZip(data = state) {
   const efileFolder = "02-attorney-efile-format-notes";
   const laterFolder = "03-later-after-domiciliary-letters";
   const productionFolder = "04-developer-output-maps";
+  zip.file("00-opening-packet-index.txt", openingPacketIndexText(data));
+  zip.file("00-launch-gate-report.txt", launchReleaseGateText("informal_probate", data));
+  zip.file("00-beta-feedback-request.txt", betaDownloadFeedbackRequestText(data));
   await addBlobToZip(zip, signFolder, `01-PR-1801-${slug}.docx`, await buildPr1801Docx(data));
   await addBlobToZip(zip, signFolder, `02-PR-1806-${slug}.docx`, await buildPr1806Docx(data));
   await addBlobToZip(zip, signFolder, `03-PR-1807-${slug}.docx`, await buildPr1807Docx(data));
@@ -14205,7 +18175,9 @@ async function buildOpeningPacketZip(data = state) {
     await addBlobToZip(zip, signFolder, `08-PR-1817-service-declaration-${slug}.docx`, await buildPr1817Docx(data));
   }
   zip.file(`${signFolder}/read-me.txt`, signingPackageReadmeText(data));
+  zip.file(`${signFolder}/00-public-print-sign-file-checklist.txt`, publicPaperFilingChecklistText(data));
   zip.file(`${signFolder}/signature-tracking.txt`, signatureTrackingText(data));
+  zip.file(`${laterFolder}/00-after-letters-checklist.txt`, laterAdministrationChecklistText(data));
   zip.file(`${laterFolder}/read-me.txt`, [
     "Later administration documents",
     "",
@@ -14213,6 +18185,7 @@ async function buildOpeningPacketZip(data = state) {
     "The opening packet folder contains the documents generally prepared to start the informal probate and obtain letters."
   ].join("\n"));
   zip.file(`${efileFolder}/read-me.txt`, attorneyEfilePackageReadmeText(data));
+  zip.file(`${efileFolder}/00-attorney-efile-prep-checklist.txt`, attorneyEfilePrepChecklistText(data));
   zip.file(`${efileFolder}/per-form-word-pdf-config.txt`, efilingFormatConfigText(data));
   zip.file(`${efileFolder}/signed-pdf-after-wet-signature-list.txt`, signedPdfFormLabels(activePacketForms(data)).map((label) => `- ${label}`).join("\n") || "- None.");
   zip.file("00-read-me.txt", [
@@ -14229,7 +18202,7 @@ async function buildOpeningPacketZip(data = state) {
     `Delivery mode selected: ${data.payment?.deliveryMode === "secure_link" ? "Secure email link later (prototype placeholder)" : "Download now"}`,
     "",
     "Filing format note",
-    "This prototype currently generates Word draft files and exact-output mapping aids. Production output should give users editable Word working copies plus exact official PDF filing copies where available. Wet-signed documents generally become signed/scanned PDFs for attorney eFiling; court-editable drafts such as PR-1808/PR-1810 may need Word/DOCX.",
+    "This prototype currently generates Word draft files and exact-output mapping aids. Attorney eFiling should organize PR-1801, PR-1804, PR-1805, and PR-1808 as Word/DOCX documents. The other opening documents and later PR-1811, PR-1814, PR-1815, PR-1816, and PR-1817 should be PDFs. Public users can still print the packet and collect wet signatures for paper filing.",
     "",
     filingInstructionsText(),
     "",
@@ -14257,6 +18230,7 @@ async function buildOpeningPacketZip(data = state) {
   zip.file("00-legal-review-checklist.txt", legalReviewChecklistText(data));
   zip.file("00-attorney-beta-validation.txt", attorneyBetaReviewText(data));
   zip.file("00-legal-logic-beta-lock.txt", legalLogicLockText(data));
+  zip.file(`${productionFolder}/00-standard-form-integrity-policy.txt`, officialFormIntegrityManifestText(data));
   zip.file(`${productionFolder}/PR-1801-overlay-map.json`, JSON.stringify(pr1801OverlayMap(data), null, 2));
   zip.file(`${productionFolder}/PR-1801-overlay-fields.csv`, pr1801OverlayFieldsCsv(data));
   zip.file(`${productionFolder}/PR-1801-coordinate-checklist.txt`, pr1801OverlayCoordinateChecklistText(data));
@@ -14404,9 +18378,13 @@ function waiverSignatureModeLabel(value = state.waiver.signatureMode) {
 
 function pr1801Values(data) {
   const willExists = data.will.exists;
+  const willTrust = willExists === "yes" && willCreatesTestamentaryTrust(data);
+  const trustRequest = hasTrustInvolved(data);
   const codicils = data.will.hasCodicils === "yes" ? documentDate(data.will.codicilDates) : "";
   const prName = cleanText(data.pr.fullName) || cleanText(data.will.nominatedPr);
-  const interested = data.interestedPersons[0] || {};
+  const interestedPeople = activeInterestedPersonsForNotice(data);
+  const useInterestedAttachment = Boolean(data.requests.interestedPersonsSeeAttached) || interestedPeople.length > 1;
+  const interested = interestedPeople[0] || {};
   const textFields = {
     1: cleanText(data.estate.county).toUpperCase(),
     2: cleanText(data.decedent.fullName),
@@ -14428,17 +18406,17 @@ function pr1801Values(data) {
     46: willExists === "yes" ? cleanText(data.will.priorCaseNumber) : "",
     50: willExists === "yes" ? cleanText(data.will.namedPr) : "",
     51: willExists === "yes" ? prName : "",
-    52: willExists === "yes" ? cleanText(data.will.namedTrustee) : "",
-    53: willExists === "yes" ? cleanText(data.will.nominatedTrustee) : "",
+    52: willTrust ? cleanText(data.will.namedTrustee) : "",
+    53: willTrust ? cleanText(data.will.nominatedTrustee) : "",
     55: willExists === "no" ? prName : "",
-    57: cleanText(interested.name),
-    58: cleanText(compactInterestedRelationship(interested)),
-    59: cleanText(interested.address),
-    60: documentDate(interested.minorDateOfBirth),
+    57: useInterestedAttachment ? "See attached" : cleanText(interested.name),
+    58: useInterestedAttachment ? "See attached" : cleanText(compactInterestedRelationship(interested)),
+    59: useInterestedAttachment ? "See attached" : cleanText(interested.address),
+    60: useInterestedAttachment ? "" : documentDate(interested.minorDateOfBirth),
     62: cleanText(data.requests.question10OtherText),
     64: cleanText(data.requests.domiciliaryLettersTo) || prName,
-    66: cleanText(data.requests.trusteeNames),
-    67: cleanText(data.requests.trustName),
+    66: trustRequest ? cleanText(data.requests.trusteeNames) : "",
+    67: trustRequest ? cleanText(data.requests.trustName) : "",
     70: cleanText(data.requests.otherText),
     71: "",
     72: cleanText(data.applicant.fullName),
@@ -14487,11 +18465,11 @@ function pr1801Values(data) {
     48: data.will.location === "probated_elsewhere",
     49: data.will.location === "en_route",
     54: willExists === "no",
-    56: Boolean(data.requests.interestedPersonsSeeAttached) || data.interestedPersons.length > 1,
+    56: useInterestedAttachment,
     61: Boolean(data.requests.question10OtherSelected),
     63: willExists === "yes",
-    65: Boolean(data.requests.appointTrustee),
-    68: Boolean(data.requests.additionalTrusts),
+    65: trustRequest && Boolean(data.requests.appointTrustee),
+    68: trustRequest && Boolean(data.requests.additionalTrusts),
     69: Boolean(data.requests.otherSelected)
   };
   return { textFields, checkboxFields };
@@ -14930,13 +18908,11 @@ function attachmentParagraph(text, bold = false) {
 }
 
 function appendInterestedAttachment(xml, data) {
-  if (data.interestedPersons.length <= 1) return xml;
+  const people = activeInterestedPersonsForNotice(data);
+  const useAttachment = Boolean(data.requests?.interestedPersonsSeeAttached) || people.length > 1;
+  if (!useAttachment || !people.length) return xml;
   const rows = [attachmentParagraph("Attachment to PR-1801: Interested Persons", true)];
-  data.interestedPersons.forEach((person, index) => {
-    let line = `${index + 1}. ${cleanText(person.name) || "(name missing)"}; ${cleanText(compactInterestedRelationship(person)) || "(relationship missing)"}; ${cleanText(person.address) || "(address missing)"}`;
-    if (cleanText(person.minorDateOfBirth)) line += `; minor date of birth: ${documentDate(person.minorDateOfBirth)}`;
-    rows.push(attachmentParagraph(line));
-  });
+  pr1801InterestedAttachmentLines(data).forEach((line) => rows.push(attachmentParagraph(line)));
   const insertion = rows.join("");
   const sectIndex = xml.lastIndexOf("<w:sectPr");
   const bodyClose = xml.lastIndexOf("</w:body>");
@@ -14944,6 +18920,14 @@ function appendInterestedAttachment(xml, data) {
     return xml.slice(0, sectIndex) + insertion + xml.slice(sectIndex);
   }
   return xml.replace("</w:body>", `${insertion}</w:body>`);
+}
+
+function pr1801InterestedAttachmentLines(data) {
+  return activeInterestedPersonsForNotice(data).map((person, index) => {
+    let line = `${index + 1}. ${cleanText(person.name) || "(name missing)"}; ${cleanText(compactInterestedRelationship(person)) || "(relationship missing)"}; ${cleanText(person.address) || "(address missing)"}`;
+    if (cleanText(person.minorDateOfBirth)) line += `; minor date of birth: ${documentDate(person.minorDateOfBirth)}`;
+    return line;
+  });
 }
 
 function base64ToUint8Array(base64) {
@@ -15007,6 +18991,7 @@ function pr1803Values(data) {
   const willExists = data.will.exists === "yes";
   const codicils = data.will.hasCodicils === "yes" ? documentDate(data.will.codicilDates) : "";
   const signerDate = documentDate(data.waiver.signatureDate) || documentDate(data.applicant.signatureDate);
+  const signers = activeInterestedPersonsForNotice(data);
   const textFields = {
     1: cleanText(data.estate.county).toUpperCase(),
     2: cleanText(data.decedent.fullName),
@@ -15029,7 +19014,7 @@ function pr1803Values(data) {
 
   const signerStarts = [19, 26, 33, 40, 47, 54, 61, 68];
   signerStarts.forEach((start, index) => {
-    const signer = data.interestedPersons[index] || {};
+    const signer = signers[index] || {};
     textFields[start] = "";
     textFields[start + 1] = cleanText(signer.name);
     textFields[start + 2] = cleanText(signer.address);
@@ -15051,10 +19036,11 @@ function pr1803Values(data) {
 }
 
 function appendPr1803Attachment(xml, data) {
-  if (data.interestedPersons.length <= 8) return xml;
+  const signers = activeInterestedPersonsForNotice(data);
+  if (signers.length <= 8) return xml;
   const rows = [
     attachmentParagraph("Attachment to PR-1803: Additional Waiver Signers", true),
-    ...data.interestedPersons.slice(8).map((person, index) => {
+    ...signers.slice(8).map((person, index) => {
       const number = index + 9;
       return attachmentParagraph(`${number}. ${cleanText(person.name) || "(name missing)"}; ${cleanText(person.address) || "(address missing)"}`);
     })
@@ -15090,7 +19076,7 @@ async function addPr1803WaiversToZip(zip, data, folder, slug) {
     await addBlobToZip(zip, folder, `04-PR-1803-${slug}.docx`, await buildPr1803Docx(data));
     return;
   }
-  const signers = data.interestedPersons.filter(hasInterestedPersonContent);
+  const signers = activeInterestedPersonsForNotice(data);
   for (const [index, signer] of signers.entries()) {
     const signerSlug = cleanText(signer.name).replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || `signer-${index + 1}`;
     const signerData = dataWithSingleWaiverSigner(data, signer);
@@ -15102,7 +19088,7 @@ async function buildPr1803IndividualWaiverZip(data) {
   if (!window.JSZip) throw new Error("The local ZIP library did not load.");
   const review = validate1803(data);
   if (review.blockers.length) throw new Error(review.blockers[0]);
-  const signers = data.interestedPersons.filter(hasInterestedPersonContent);
+  const signers = activeInterestedPersonsForNotice(data);
   if (!signers.length) throw new Error("PR-1803 needs at least one interested person.");
   const zip = new JSZip();
   const slug = estateSlug();
@@ -15163,7 +19149,8 @@ async function buildPr1804Docx(data) {
 
 function pr1806Values(data) {
   const h = data.heirship;
-  const hasDeceasedChildDetails = hasValue(h.children.deceasedChildDescendants);
+  const deceasedChildRows = pr1806DeceasedChildAttachmentRows(data);
+  const hasDeceasedChildDetails = deceasedChildRows.length > 0;
   const hasDeceasedSiblingDetails = hasValue(h.siblings.deceasedSiblingDescendants);
   const hasGrandparentDetails = hasValue(h.grandparents.summary);
   const answerParents = h.spouse.exists === "no" && h.children.exists === "no";
@@ -15178,8 +19165,8 @@ function pr1806Values(data) {
     9: cleanText(h.informant.address),
     10: compactRelationshipText(h.informant.relationship),
     13: h.spouse.exists === "yes" ? cleanText(h.spouse.name) : "",
-    17: h.children.exists === "yes" ? childrenTextFromPeople(h.children.people) || cleanText(h.children.list) : "",
-    18: "",
+    17: h.children.exists === "yes" ? childrenNamesForPr1806(h.children.people) || cleanText(h.children.list) : "",
+    18: h.children.exists === "yes" ? childrenDeceasedDatesForPr1806(h.children.people) : "",
     20: hasDeceasedChildDetails ? "See attached" : "",
     21: "",
     22: "",
@@ -15240,9 +19227,7 @@ function pr1806Values(data) {
 function appendPr1806Attachment(xml, data) {
   const h = data.heirship;
   const rows = [];
-  if (hasValue(h.children.deceasedChildDescendants)) {
-    rows.push(`Descendants of deceased children: ${cleanText(h.children.deceasedChildDescendants)}`);
-  }
+  rows.push(...pr1806DeceasedChildAttachmentRows(data));
   if (hasValue(h.siblings.deceasedSiblingDescendants)) {
     rows.push(`Descendants of deceased siblings: ${cleanText(h.siblings.deceasedSiblingDescendants)}`);
   }
@@ -15426,7 +19411,7 @@ async function buildPr1805Docx(data) {
 }
 
 function pr1817Values(data) {
-  const recipients = data.interestedPersons.filter((person) => hasValue(person.name) || hasValue(person.address));
+  const recipients = activeInterestedPersonsForNotice(data);
   const useAttachment = recipients.length > 1;
   const firstRecipient = recipients[0] || {};
   const textFields = {
@@ -15465,7 +19450,7 @@ function pr1817Values(data) {
 }
 
 function appendPr1817Attachment(xml, data) {
-  const recipients = data.interestedPersons.filter((person) => hasValue(person.name) || hasValue(person.address));
+  const recipients = activeInterestedPersonsForNotice(data);
   if (recipients.length <= 1) return xml;
   const rows = [
     attachmentParagraph("Attachment to PR-1817: Persons Served", true),
@@ -15498,6 +19483,7 @@ async function buildPr1817Docx(data) {
 
 function pr1808Values(data) {
   const willExists = data.will.exists === "yes";
+  const trustRequest = hasTrustInvolved(data);
   const codicils = data.will.hasCodicils === "yes" ? documentDate(data.will.codicilDates) : "";
   const prBondType = data.courtDrafts.prBondType || "none";
   const trusteeBondType = data.courtDrafts.trusteeBondType || "none";
@@ -15519,9 +19505,9 @@ function pr1808Values(data) {
     25: willExists ? codicils : "",
     26: cleanText(data.requests.domiciliaryLettersTo) || prName,
     31: prBondType === "surety" ? moneyText(data.courtDrafts.prBondAmount) : "",
-    33: cleanText(data.requests.trusteeNames),
-    34: cleanText(data.requests.trustName),
-    39: trusteeBondType === "surety" ? moneyText(data.courtDrafts.trusteeBondAmount) : "",
+    33: trustRequest ? cleanText(data.requests.trusteeNames) : "",
+    34: trustRequest ? cleanText(data.requests.trustName) : "",
+    39: trustRequest && trusteeBondType === "surety" ? moneyText(data.courtDrafts.trusteeBondAmount) : "",
     42: cleanText(data.courtDrafts.otherOrdersText),
     43: cleanText(data.preparer.fullName),
     44: cleanText(data.preparer.address),
@@ -15546,12 +19532,12 @@ function pr1808Values(data) {
     28: prBondType === "signature" || prBondType === "surety",
     29: prBondType === "signature",
     30: prBondType === "surety",
-    32: Boolean(data.requests.appointTrustee),
-    35: Boolean(data.requests.appointTrustee) && trusteeBondType === "none",
-    36: Boolean(data.requests.appointTrustee) && (trusteeBondType === "signature" || trusteeBondType === "surety"),
-    37: Boolean(data.requests.appointTrustee) && trusteeBondType === "signature",
-    38: Boolean(data.requests.appointTrustee) && trusteeBondType === "surety",
-    40: Boolean(data.requests.additionalTrusts),
+    32: trustRequest && Boolean(data.requests.appointTrustee),
+    35: trustRequest && Boolean(data.requests.appointTrustee) && trusteeBondType === "none",
+    36: trustRequest && Boolean(data.requests.appointTrustee) && (trusteeBondType === "signature" || trusteeBondType === "surety"),
+    37: trustRequest && Boolean(data.requests.appointTrustee) && trusteeBondType === "signature",
+    38: trustRequest && Boolean(data.requests.appointTrustee) && trusteeBondType === "surety",
+    40: trustRequest && Boolean(data.requests.additionalTrusts),
     41: Boolean(data.courtDrafts.otherOrdersSelected)
   };
   return { textFields, checkboxFields };
@@ -15721,7 +19707,49 @@ function setDownloadArea(message, tone = "") {
   });
 }
 
-function showDownloadLink(blob, filename) {
+function betaDownloadFollowupHtml(productKey = documentProductKey()) {
+  if (!CONTROLLED_BETA_MODE) return "";
+  return `
+    <div class="download-followup">
+      <strong>Beta follow-up</strong>
+      <p>After reviewing the packet, please leave feedback about packet decisions, interested persons, form output, or signing/eFiling instructions.</p>
+      <button type="button" class="secondary" data-open-beta-feedback="${escapeAttr(productKey)}">Leave beta feedback</button>
+    </div>
+  `;
+}
+
+function openBetaFeedbackPanel(productKey = documentProductKey()) {
+  state.account.feedbackCategory = productKey === "transfer_affidavit" ? "form_output" : state.account.feedbackCategory || "form_output";
+  state.account.downloadFeedbackPromptedAt = state.account.downloadFeedbackPromptedAt || new Date().toISOString();
+  saveState();
+  setViewMode("forms");
+  window.setTimeout(() => {
+    const feedback = document.querySelector('[data-account-field="feedback"]');
+    feedback?.scrollIntoView({ behavior: "smooth", block: "center" });
+    feedback?.focus({ preventScroll: true });
+  }, 0);
+}
+
+function bindDownloadFollowupActions() {
+  document.querySelectorAll("[data-open-beta-feedback]").forEach((button) => {
+    button.addEventListener("click", () => openBetaFeedbackPanel(button.dataset.openBetaFeedback || documentProductKey()));
+  });
+}
+
+function markFinalPacketDownloaded(productKey = documentProductKey()) {
+  state.payment.finalDownloadedAt = new Date().toISOString();
+  state.payment.productKey = productKey;
+  state.payment.launchGateMode = launchReleaseGateStatus(productKey).mode;
+  state.account.downloadFeedbackPromptedAt = state.account.downloadFeedbackPromptedAt || state.payment.finalDownloadedAt;
+  if (CONTROLLED_BETA_MODE && !hasValue(state.account.feedback)) {
+    state.account.feedbackCategory = productKey === "transfer_affidavit" ? "form_output" : "packet_decision";
+    state.account.feedbackSeverity = state.account.feedbackSeverity || "medium";
+  }
+  persistMatterCheckpoint("packet_download_checkpoint");
+  saveState();
+}
+
+function showDownloadLink(blob, filename, options = {}) {
   const url = URL.createObjectURL(blob);
   let firstLink = null;
   document.querySelectorAll("#downloadArea, #formsDownloadArea, #guidedDownloadArea").forEach((downloadArea) => {
@@ -15731,10 +19759,13 @@ function showDownloadLink(blob, filename) {
     link.textContent = `Download ${filename}`;
     const message = document.createElement("p");
     message.textContent = `Started download for ${filename}.`;
+    const followup = document.createElement("div");
+    followup.innerHTML = options.followupHtml || "";
     downloadArea.className = "download-area success";
-    downloadArea.replaceChildren(message, link);
+    downloadArea.replaceChildren(message, link, ...Array.from(followup.childNodes));
     if (!firstLink) firstLink = link;
   });
+  bindDownloadFollowupActions();
   firstLink?.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
@@ -15852,8 +19883,9 @@ async function exportOpeningPacket(buttonTarget) {
     state.matter.lastGeneratedAt = new Date().toISOString();
     recordAnalyticsEvent("packet_generated", { formKey: "opening_packet" });
     recordAuditLog("generate_packet", { formKey: "opening_packet", templateVersion: "prototype-docx" });
-    showDownloadLink(blob, filename);
+    showDownloadLink(blob, filename, { followupHtml: betaDownloadFollowupHtml("informal_probate") });
     state.matter.lastDownloadedAt = new Date().toISOString();
+    markFinalPacketDownloaded("informal_probate");
     recordAnalyticsEvent("packet_downloaded", { formKey: "opening_packet" });
     recordAuditLog("download_packet", { formKey: "opening_packet" });
   } catch (error) {
@@ -15878,8 +19910,9 @@ async function exportTransferAffidavitPackage(buttonTarget) {
     state.matter.lastGeneratedAt = new Date().toISOString();
     recordAnalyticsEvent("packet_generated", { formKey: "transfer_affidavit" });
     recordAuditLog("generate_packet", { formKey: "transfer_affidavit", templateVersion: "prototype-docx" });
-    showDownloadLink(blob, `transfer-by-affidavit-package-${estateSlug()}.zip`);
+    showDownloadLink(blob, `transfer-by-affidavit-package-${estateSlug()}.zip`, { followupHtml: betaDownloadFollowupHtml("transfer_affidavit") });
     state.matter.lastDownloadedAt = new Date().toISOString();
+    markFinalPacketDownloaded("transfer_affidavit");
     recordAnalyticsEvent("packet_downloaded", { formKey: "transfer_affidavit" });
     recordAuditLog("download_packet", { formKey: "transfer_affidavit" });
   } catch (error) {
@@ -16048,6 +20081,8 @@ if (typeof module !== "undefined") {
     evaluateTestScenario,
     emptyState,
     mergeDeep,
+    activeInterestedPersonsForNotice,
+    pr1801InterestedAttachmentLines,
     pr1801Values,
     pr1803Values,
     pr1804Values,

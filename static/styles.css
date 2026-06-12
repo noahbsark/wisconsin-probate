@@ -1771,6 +1771,15 @@ textarea {
   max-width: 640px;
 }
 
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
 .interview-choice-label {
   margin-bottom: 8px;
   color: #29464c;
@@ -2080,6 +2089,18 @@ textarea {
   line-height: 1.4;
 }
 
+.guided-note.compact {
+  padding: 12px 14px;
+  background: #f8fbfb;
+}
+
+.question-helper {
+  margin: -2px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .flow-divider {
   display: flex;
   align-items: center;
@@ -2105,12 +2126,54 @@ textarea {
 
 .route-result,
 .route-question,
+.starter-input-card,
 .product-card,
 .payment-gate {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
   box-shadow: var(--shadow-sm);
+}
+
+.starter-input-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-color: #9fd4c1;
+  border-left: 6px solid var(--accent);
+  background: #f6fcf9;
+}
+
+.starter-input-card h3 {
+  margin: 6px 0 0;
+  color: var(--accent-dark);
+  font-size: 18px;
+}
+
+.start-input-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.starter-money-input {
+  min-height: 48px;
+  border-color: #9fd4c1;
+  background: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.starter-money-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(27, 136, 92, 0.16);
 }
 
 .probate-start-hero {
@@ -2228,6 +2291,18 @@ textarea {
   background: #f8fbfb;
 }
 
+.product-card[data-product-jump] {
+  cursor: pointer;
+}
+
+.product-card[data-product-jump]:hover,
+.product-card[data-product-jump]:focus {
+  border-color: var(--accent);
+  background: #ffffff;
+  box-shadow: var(--shadow-md);
+  outline: none;
+}
+
 .product-card.active {
   border-color: #9ed7b7;
   background: #ffffff;
@@ -2254,6 +2329,14 @@ textarea {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.card-action {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .benefit-question {
@@ -2354,6 +2437,47 @@ textarea {
   margin-top: 10px !important;
   color: #8a5100 !important;
   font-weight: 800;
+}
+
+.launch-gate-summary {
+  margin-top: 10px;
+  border: 1px solid #cfe0dc;
+  border-radius: 8px;
+  background: #f8fcfa;
+  padding: 10px 12px;
+}
+
+.launch-gate-summary.warn {
+  border-color: #efcf93;
+  background: #fff8e8;
+}
+
+.launch-gate-summary.bad {
+  border-color: #f1b5b5;
+  background: #fff0f0;
+}
+
+.launch-gate-summary summary {
+  cursor: pointer;
+  font-weight: 850;
+  color: var(--ink);
+}
+
+.launch-gate-body {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.launch-gate-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.launch-gate-body li {
+  margin: 3px 0;
 }
 
 .payment-gate-panel {
@@ -2594,6 +2718,104 @@ textarea {
 
 .filing-room-panel li + li {
   margin-top: 6px;
+}
+
+.final-review-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.final-review-section.warn {
+  border-color: #efcf93;
+  background: #fffdf7;
+}
+
+.final-review-section h3,
+.final-review-section p {
+  margin: 0;
+}
+
+.final-review-section p {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.final-review-forms {
+  margin-top: 12px;
+}
+
+.final-review-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.final-review-list.compact {
+  gap: 6px;
+}
+
+.final-review-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #f7fbf9;
+}
+
+.final-review-row.warn {
+  border-color: #efcf93;
+  background: #fff8e8;
+}
+
+.final-review-row.bad {
+  border-color: #f1b5b5;
+  background: #fff7f7;
+}
+
+.final-review-row.muted {
+  background: #f8fbfb;
+  color: var(--muted);
+}
+
+.final-review-row strong,
+.final-review-row span,
+.final-review-row p {
+  display: block;
+}
+
+.final-review-row strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.final-review-row span {
+  margin-top: 3px;
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.final-review-row p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agreement-section {
+  display: grid;
+  gap: 12px;
+  background: #f8fbfb;
+}
+
+.final-review-check {
+  margin-top: 0;
+  border: 1px solid #b8dfcb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
 }
 
 .filing-instructions-screen {
@@ -3092,6 +3314,17 @@ button {
   border-color: #b8dfcb;
 }
 
+.secondary.prominent-add {
+  background: #ffffff;
+  border-color: var(--accent);
+  color: var(--accent-dark);
+  box-shadow: 0 2px 8px rgba(5, 102, 58, 0.08);
+}
+
+.secondary.prominent-add:hover {
+  background: var(--soft);
+}
+
 .secondary:hover {
   background: #e7f8ef;
   border-color: #8ed0ad;
@@ -3130,6 +3363,12 @@ button {
 .review {
   position: sticky;
   top: 102px;
+}
+
+.edit-return-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }
 
 .review-card {
@@ -3263,6 +3502,23 @@ button {
   color: var(--accent-dark);
   text-decoration: none;
   word-break: break-word;
+}
+
+.download-followup {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #b7e4c3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.download-followup p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .person-list {
@@ -3415,6 +3671,74 @@ button {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+.legal-audit-summary-grid,
+.legal-audit-card-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.legal-audit-summary-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.legal-audit-summary-grid > div,
+.legal-audit-card-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.legal-audit-summary-grid > div.warn,
+.legal-audit-card-row.warn {
+  border-color: #efcf93;
+  background: #fff8e8;
+}
+
+.legal-audit-summary-grid > div.bad,
+.legal-audit-card-row.bad {
+  border-color: #f1b5b5;
+  background: #fff7f7;
+}
+
+.legal-audit-summary-grid strong,
+.legal-audit-summary-grid span,
+.legal-audit-card-row strong,
+.legal-audit-card-row span {
+  display: block;
+}
+
+.legal-audit-summary-grid strong {
+  color: var(--accent-dark);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.legal-audit-summary-grid span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.legal-audit-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.legal-audit-card-row strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.legal-audit-card-row span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .audit-decision {
@@ -3726,6 +4050,47 @@ button {
   border-top: 1px solid var(--line);
 }
 
+.route-result,
+.route-question,
+.product-card,
+.handoff-card,
+.payment-gate,
+.payment-gate-panel,
+.guided-person-card,
+.service-focus-card,
+.suggestion-card,
+.source-review-card,
+.packet-form-row,
+.packet-person-row,
+.task-row,
+.readiness-form-row,
+.logic-detail-row,
+.logic-person-row,
+.logic-form-row,
+.admin-readiness-row,
+.legal-review-row,
+.attorney-beta-row,
+.choice-button {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.route-result *,
+.route-question *,
+.product-card *,
+.handoff-card *,
+.payment-gate *,
+.guided-person-card *,
+.service-focus-card *,
+.suggestion-card *,
+.packet-form-row *,
+.packet-person-row *,
+.task-row *,
+.readiness-form-row *,
+.choice-button * {
+  min-width: 0;
+}
+
 @media (max-width: 1100px) {
   .layout,
   .interview-view {
@@ -3786,6 +4151,8 @@ button {
   .suggestion-card,
   .source-review-card,
   .audit-stat-grid,
+  .legal-audit-summary-grid,
+  .legal-audit-card-grid,
   .account-grid,
   .account-actions,
   .beta-status-grid,

@@ -1,6 +1,13 @@
 window.PROBATE_PLATFORM_CONFIG = {
   environment: "prototype-local",
   dataModelVersion: "platform-foundation-2026-06-09",
+  launch: {
+    mode: "controlled_beta",
+    publicPaidLaunchAllowed: false,
+    betaPriceLabel: "$0 beta",
+    targetInformalProbatePrice: "$499 target launch price",
+    targetTransferAffidavitPrice: "$149 target launch price"
+  },
   company: {
     companyName: "Wisconsin Probate Forms",
     companyLegalName: "[Company Name TBD]",

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Wisconsin Probate Forms</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=2026-06-12-quick-pick-selected-1" />
   </head>
   <body>
     <header class="topbar">
@@ -22,6 +22,7 @@
           <button type="button" id="scenariosModeBtn" class="mode-button">Test scenarios</button>
           <button type="button" id="editModeBtn" class="mode-button">Review/Edit answers</button>
         </div>
+        <button type="button" id="tasksShortcutBtn" class="secondary">Tasks</button>
         <button type="button" id="saveCaseBtn" class="secondary">Save case</button>
         <button type="button" id="loadCaseBtn" class="secondary">Load case</button>
         <input type="file" id="caseFileInput" accept="application/json,.json" hidden />
@@ -282,6 +283,9 @@
       </nav>
 
       <main class="workspace">
+        <div class="edit-return-bar">
+          <button type="button" id="returnGuidedFromEditBtn" class="secondary">Return to Guided Interview</button>
+        </div>
         <form id="intakeForm">
           <section class="panel active" data-panel="triage">
             <div class="panel-heading">
@@ -334,19 +338,19 @@
                 <label>Courthouse address
                   <input data-path="countyDefaults.courthouseAddress" placeholder="Street, city, state, zip" />
                 </label>
-                <label>Room or branch
+                <label>Room or branch, if known
                   <input data-path="countyDefaults.room" />
                 </label>
                 <label>Probate office
                   <input data-path="countyDefaults.probateOfficeName" placeholder="Probate Division" />
                 </label>
-                <label>Probate registrar
+                <label>Probate registrar, if known
                   <input data-path="countyDefaults.registrarName" />
                 </label>
                 <label>Publication newspaper
                   <input data-path="countyDefaults.newspaperName" />
                 </label>
-                <label>Accommodation phone
+                <label>Accommodation phone, if known
                   <input data-path="countyDefaults.accommodationPhone" />
                 </label>
                 <label>Local notes
@@ -407,10 +411,11 @@
                   <label>Phone
                     <input data-path="applicant.phone" />
                   </label>
-                  <label>Signature date
+                  <label>Signature date (optional)
                     <input type="date" data-path="applicant.signatureDate" />
+                    <span class="field-hint">Enter the date the form will be signed, or leave blank if the signature date is not known yet.</span>
                   </label>
-                  <label>State Bar number
+                  <label>Attorney State Bar number (if attorney)
                     <input data-path="applicant.barNumber" />
                   </label>
                 </div>
@@ -423,7 +428,7 @@
                 </label>
                 <div class="path-card mini" data-show-when="prSame">
                   <h3>Using applicant contact details</h3>
-                  <p>The proposed PR name, address, email, phone, signature date, and bar number will follow the applicant answers.</p>
+                  <p>The proposed PR name, address, email, phone, any signature date entered, and bar number will follow the applicant answers.</p>
                 </div>
                 <div class="grid two compact" data-show-when="prDifferent">
                   <label>Name
@@ -438,10 +443,11 @@
                   <label>Phone
                     <input data-path="pr.phone" />
                   </label>
-                  <label>Signature date
+                  <label>Signature date (optional)
                     <input type="date" data-path="pr.signatureDate" />
+                    <span class="field-hint">Enter the date the form will be signed, or leave blank if the signature date is not known yet.</span>
                   </label>
-                  <label>State Bar number
+                  <label>Attorney State Bar number (if attorney)
                     <input data-path="pr.barNumber" />
                   </label>
                 </div>
@@ -456,6 +462,7 @@
             </div>
             <div class="preparer-box" data-show-when="residentAgent">
               <h3>Resident agent for nonresident PR</h3>
+              <p class="helper-text">If the proposed Personal Representative does not live in Wisconsin, PR-1807 asks for a Wisconsin resident agent who can receive probate papers for the nonresident PR.</p>
               <div class="grid two compact">
                 <label>Resident agent name
                   <input data-path="pr.residentAgent.name" />
@@ -469,10 +476,11 @@
                 <label>Phone
                   <input data-path="pr.residentAgent.phone" />
                 </label>
-                <label>Signature date
+                <label>Signature date (optional)
                   <input type="date" data-path="pr.residentAgent.signatureDate" />
+                  <span class="field-hint">Enter the date the form will be signed, or leave blank if the signature date is not known yet.</span>
                 </label>
-                <label>State Bar number
+                <label>Attorney State Bar number (if attorney)
                   <input data-path="pr.residentAgent.barNumber" />
                 </label>
               </div>
@@ -521,10 +529,18 @@
               <label data-show-when="willYes">PR named in will
                 <input data-path="will.namedPr" />
               </label>
-              <label data-show-when="willYes">Trustee named in will
+              <label data-show-when="willYes">Does the will create a trust that continues after death?
+                <select data-path="will.createsTestamentaryTrust">
+                  <option value="">Select</option>
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                  <option value="unknown">Not sure</option>
+                </select>
+              </label>
+              <label data-show-when="willTestamentaryTrust">Trustee named for that will-created trust
                 <input data-path="will.namedTrustee" />
               </label>
-              <label data-show-when="willYes">Nominated trustee
+              <label data-show-when="willTestamentaryTrust">Nominated trustee for that will-created trust
                 <input data-path="will.nominatedTrustee" />
               </label>
             </div>
@@ -588,16 +604,16 @@
           <section class="panel" data-panel="beneficiaries" data-show-when="willYes">
             <div class="panel-heading row-heading">
               <div>
-                <p class="eyebrow">Will and trust beneficiaries</p>
-                <h2>People named in the will or codicil</h2>
+                <p class="eyebrow">Will beneficiaries</p>
+                <h2>People or organizations named in the will or codicil</h2>
               </div>
-              <button type="button" id="addWillBeneficiaryBtn" class="secondary" data-show-when="willBeneficiariesYes">Add beneficiary</button>
+              <button type="button" id="addWillBeneficiaryBtn" class="secondary prominent-add" data-show-when="willBeneficiariesYes">Add another beneficiary or named party</button>
             </div>
             <div class="path-card">
               <h3>Beneficiaries can be interested persons</h3>
-              <p>For opening, add each person or entity named to receive property under the will or codicil, and any trust beneficiary you know from the will. Do not enter asset values or bequest details here.</p>
+              <p>For opening, add each person or entity named to receive property under the will or codicil. Add trust beneficiaries only if the will creates a trust. Do not enter asset values or bequest details here.</p>
             </div>
-            <label>Does the will name beneficiaries or trust beneficiaries?
+            <label>Does the will name beneficiaries or organizations?
               <select data-path="will.hasNamedBeneficiaries">
                 <option value="">Select</option>
                 <option value="yes">Yes</option>
@@ -638,7 +654,7 @@
                       <option value="no">No</option>
                     </select>
                   </label>
-                  <label data-show-when="spouseYes">Name
+                  <label data-show-when="spouseYes">Spouse/domestic partner name
                     <input data-path="heirship.spouse.name" />
                   </label>
                 </div>
@@ -666,8 +682,8 @@
                 <label data-show-when="blendedChildren">Details if not all children are of surviving spouse
                   <input data-path="heirship.children.blendedDetails" />
                 </label>
-                <label data-show-when="childrenYes">Descendants of deceased children
-                  <input data-path="heirship.children.deceasedChildDescendants" placeholder="Deceased child - descendants - dates if needed" />
+                <label data-show-when="childrenYes">Additional deceased-child descendant details
+                  <input data-path="heirship.children.deceasedChildDescendants" placeholder="Use if details do not fit under a deceased child below" />
                 </label>
               </div>
               <div id="heirshipChildList" class="person-list" data-show-when="childrenYes"></div>
@@ -850,8 +866,9 @@
                     <option value="individual">Separate waiver for each signer</option>
                   </select>
                 </label>
-                <label>Waiver signer date
+                <label>Waiver signature date (optional)
                   <input type="date" data-path="waiver.signatureDate" />
+                  <span class="field-hint">Enter the date the waiver will be signed, or leave blank if the signature date is not known yet.</span>
                 </label>
               </div>
               <div class="inline-checks">
@@ -894,7 +911,7 @@
                 <label>Courthouse address
                   <input data-path="notice1804.courthouseAddress" placeholder="901 North 9th Street" />
                 </label>
-                <label>Room
+                <label>Room or branch, if known
                   <input data-path="notice1804.room" />
                 </label>
               </div>
@@ -909,10 +926,10 @@
                 <label>Courthouse address
                   <input data-path="notice1805.courthouseAddress" placeholder="901 North 9th Street" />
                 </label>
-                <label>Room
+                <label>Room or branch, if known
                   <input data-path="notice1805.room" />
                 </label>
-                <label>Probate Registrar
+                <label>Probate registrar, if known
                   <input data-path="notice1805.registrarName" />
                 </label>
                 <label>Hearing date
@@ -924,7 +941,7 @@
                 <label>Claim deadline
                   <input type="date" data-path="notice1805.claimDeadline" />
                 </label>
-                <label>Accommodation phone
+                <label>Accommodation phone, if known
                   <input data-path="notice1805.accommodationPhone" />
                 </label>
               </div>
@@ -981,8 +998,9 @@
                   <option value="Certified mail return receipt requested">Certified mail return receipt requested</option>
                 </select>
               </label>
-              <label>Signature date
+              <label>Signature date (optional)
                 <input type="date" data-path="service.signatureDate" />
+                <span class="field-hint">Enter the date the form will be signed, or leave blank if the signature date is not known yet.</span>
               </label>
             </div>
             <label>Documents provided
@@ -1068,8 +1086,9 @@
             </div>
             <div id="inventoryList" class="person-list"></div>
             <div class="preparer-box">
-              <label>Inventory signature date
+              <label>Inventory signature date (optional)
                 <input type="date" data-path="inventory.signatureDate" />
+                <span class="field-hint">Enter the date the form will be signed, or leave blank if the signature date is not known yet.</span>
               </label>
             </div>
           </section>
@@ -1167,7 +1186,7 @@
                 <label>Phone
                   <input data-path="preparer.phone" />
                 </label>
-                <label>State Bar number
+                <label>Attorney State Bar number (if attorney)
                   <input data-path="preparer.barNumber" />
                 </label>
               </div>
@@ -1221,6 +1240,6 @@
     <script src="template-data-pr1805.js"></script>
     <script src="template-data-pr1817.js"></script>
     <script src="platform-config.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=2026-06-12-quick-pick-selected-1"></script>
   </body>
 </html>
