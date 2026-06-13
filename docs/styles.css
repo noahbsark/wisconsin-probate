@@ -1780,6 +1780,14 @@ textarea {
   line-height: 1.35;
 }
 
+.required-marker {
+  margin-left: 6px;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .interview-choice-label {
   margin-bottom: 8px;
   color: #29464c;
@@ -1794,6 +1802,7 @@ textarea {
 }
 
 .choice-button {
+  position: relative;
   min-height: 52px;
   border-color: #c6deda;
   background: #ffffff;
@@ -1802,19 +1811,48 @@ textarea {
   padding: 14px 16px;
   white-space: normal;
   box-shadow: 0 1px 0 rgba(20, 47, 44, 0.03);
+  cursor: pointer;
 }
 
 .choice-button:hover {
   border-color: var(--accent);
   background: #f3fbf7;
   box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.choice-button:active {
+  transform: translateY(0);
 }
 
 .choice-button.selected {
   border-color: var(--accent);
   background: var(--soft);
   color: var(--accent-dark);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  padding-right: 96px;
+  box-shadow: inset 0 0 0 2px var(--accent), 0 6px 14px rgba(10, 143, 79, 0.10);
+}
+
+.choice-button.selected::after {
+  content: "Selected";
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--accent-dark);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.choice-button:disabled {
+  background: #eef4f6;
+  border-color: var(--line);
+  color: #7a8c91;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .choice-button strong,
@@ -1883,6 +1921,11 @@ textarea {
 
 .guided-toolbar .badge {
   margin-right: auto;
+}
+
+.guided-toolbar .secondary,
+.guided-toolbar .primary {
+  white-space: normal;
 }
 
 .guided-card-list,
@@ -2018,6 +2061,31 @@ textarea {
   line-height: 1.4;
 }
 
+.next-action-card {
+  border: 1px solid #b9dbcf;
+  border-left: 5px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #f7fbfa;
+}
+
+.next-action-card strong,
+.next-action-card p {
+  margin: 0;
+}
+
+.next-action-card strong {
+  display: block;
+  color: var(--accent-dark);
+  font-size: 13px;
+}
+
+.next-action-card p {
+  margin-top: 4px;
+  color: #29464c;
+  line-height: 1.35;
+}
+
 .simple-packet-result {
   border-left: 5px solid var(--accent);
 }
@@ -2092,6 +2160,32 @@ textarea {
 .guided-note.compact {
   padding: 12px 14px;
   background: #f8fbfb;
+}
+
+.guided-note h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.guided-note ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
+}
+
+.future-admin-note summary {
+  cursor: pointer;
+  font-weight: 900;
+  color: var(--green-800);
+}
+
+.future-admin-note p {
+  margin-top: 10px;
+}
+
+.future-admin-note a {
+  color: var(--green-800);
+  font-weight: 900;
 }
 
 .question-helper {
@@ -2934,6 +3028,18 @@ textarea {
   background: var(--soft);
 }
 
+.county-stat-button {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.county-stat-button:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
 .contact-stat.bad {
   background: #fff0f0;
   border-color: #f1b5b5;
@@ -3278,6 +3384,13 @@ button:focus-visible {
   accent-color: var(--accent);
 }
 
+.prominent-checkline {
+  border: 1px solid #c6deda;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #f7fbfa;
+}
+
 button {
   min-height: 40px;
   border-radius: 6px;
@@ -3369,6 +3482,19 @@ button {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 12px;
+}
+
+.edit-return-bottom {
+  margin: 0;
+  padding: 18px 26px 26px;
+  border-top: 1px solid var(--line);
+  background: #fbfefc;
+}
+
+.edit-return-bottom .secondary {
+  min-height: 46px;
+  padding-inline: 18px;
+  box-shadow: 0 4px 12px rgba(5, 102, 58, 0.08);
 }
 
 .review-card {
@@ -3544,9 +3670,9 @@ button {
 
 .suggestion-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(190px, auto);
   gap: 12px;
-  align-items: center;
+  align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
@@ -3554,8 +3680,14 @@ button {
   box-shadow: var(--shadow-sm);
 }
 
+.suggestion-main {
+  min-width: 0;
+}
+
 .suggestion-card h3 {
   margin: 0 0 4px;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .suggestion-card p {
@@ -3570,6 +3702,8 @@ button {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .suggestion-actions {
@@ -3578,6 +3712,11 @@ button {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
+}
+
+.suggestion-actions .secondary {
+  white-space: normal;
 }
 
 .source-review-list {
@@ -3602,7 +3741,6 @@ button {
   border-color: #efcf93;
 }
 
-.source-review-card.excluded,
 .source-review-card.bad {
   background: #fff7f7;
   border-color: #f1b5b5;
@@ -3796,6 +3934,101 @@ button {
 .roster-list {
   display: grid;
   gap: 10px;
+}
+
+.roster-snapshot {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.roster-snapshot-card {
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.roster-snapshot-card.decedent {
+  border-left-color: #0f766e;
+}
+
+.roster-snapshot-card.applicant {
+  border-left-color: #2563eb;
+}
+
+.roster-snapshot-card.pr {
+  border-left-color: #7c3aed;
+}
+
+.roster-snapshot-card span,
+.roster-section-heading span {
+  text-transform: uppercase;
+}
+
+.roster-snapshot-card h3,
+.roster-snapshot-card p {
+  margin: 0;
+}
+
+.roster-snapshot-card h3 {
+  margin-top: 6px;
+}
+
+.roster-snapshot-card p {
+  margin-top: 4px;
+  color: #29464c;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.roster-snapshot-card small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.roster-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f9fcfb;
+}
+
+.roster-section.family {
+  border-color: #b7ddc8;
+}
+
+.roster-section.will {
+  border-color: #cfc1f4;
+}
+
+.roster-section.interested {
+  border-color: #b8d8ff;
+}
+
+.roster-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.roster-section-heading h3,
+.roster-section-heading p {
+  margin: 0;
+}
+
+.roster-section-heading p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .roster-card {
@@ -4171,7 +4404,9 @@ button {
   .logic-person-row,
   .logic-form-row,
   .roster-stat-grid,
+  .roster-snapshot,
   .roster-card,
+  .roster-section-heading,
   .role-grid,
   .contact-status-grid,
   .packet-result-grid,

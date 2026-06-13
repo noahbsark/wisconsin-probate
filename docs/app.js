@@ -1,6 +1,8 @@
 const storageKey = "pr1801-prototype-state-v1";
 const ADDRESS_EXAMPLE = "Street address, City, State ZIP";
+const NOT_APPLICABLE_ADDRESS = "N/A";
 const SIGNATURE_DATE_HELP = "Enter the date the form will be signed, or leave blank if the signature date is not known yet.";
+const IRS_EIN_URL = "https://www.irs.gov/businesses/small-businesses-self-employed/get-an-employer-identification-number";
 const BETA_UNLOCK_ENABLED = true;
 const PLATFORM_CONFIG = (typeof window !== "undefined" && window.PROBATE_PLATFORM_CONFIG) ? window.PROBATE_PLATFORM_CONFIG : {};
 const PLATFORM_LAUNCH_CONFIG = {
@@ -360,7 +362,10 @@ function emptyState() {
     },
     ui: {
       mode: "guided",
-      interviewStepId: "role"
+      interviewStepId: "role",
+      preparerSource: "",
+      heirshipInformantSource: "",
+      interestedSuggestionsAutoAdded: false
     },
     decedent: {
       fullName: "",
@@ -524,7 +529,7 @@ function emptyState() {
       lackInfo: false
     },
     willBeneficiaries: [
-      { name: "", role: "beneficiary", relationship: "", address: "", minorDateOfBirth: "", notes: "" }
+      emptyWillBeneficiary()
     ],
     interestedPersons: [
       emptyInterestedPerson()
@@ -640,6 +645,7 @@ function migrateLoadedState(merged, saved) {
   merged.interestedPersons = removePartialPrefixInterestedPersons(merged.interestedPersons);
   if (!merged.interestedPersons.length) merged.interestedPersons = [emptyInterestedPerson()];
   if (!merged.willBeneficiaries?.length) merged.willBeneficiaries = [emptyWillBeneficiary()];
+  merged.willBeneficiaries = (merged.willBeneficiaries || []).map(normalizeWillBeneficiary);
   if (!merged.transferAffidavit?.assets?.length) merged.transferAffidavit.assets = [emptyTransferAsset()];
   if (!Array.isArray(merged.betaIssues)) merged.betaIssues = [];
   if (!merged.signatureStatus || typeof merged.signatureStatus !== "object" || Array.isArray(merged.signatureStatus)) merged.signatureStatus = {};
@@ -727,6 +733,18 @@ function syncPathRouterValueFields(target = state, options = {}) {
   if (options.persist !== false && target === state) saveState();
 }
 
+function syncDomicileCountyFromEstateCounty(target = state, options = {}) {
+  const filingCounty = cleanText(target.estate?.county);
+  if (!filingCounty || !target.decedent) return;
+  const currentDomicileCounty = cleanText(target.decedent.domicileCounty);
+  const previousFilingCounty = cleanText(options.previousEstateCounty);
+  const shouldCopy = !currentDomicileCounty || (previousFilingCounty && countyKey(currentDomicileCounty) === countyKey(previousFilingCounty));
+  if (shouldCopy) {
+    target.decedent.domicileCounty = filingCounty;
+    if (options.persist !== false && target === state) saveState();
+  }
+}
+
 function syncSurvivingSpouseFromSpouseHistory(target = state, options = {}) {
   const spouse = target.spouse || {};
   if (spouse.everMarried === "no") {
@@ -781,6 +799,7 @@ function emptyInterestedPerson() {
     name: "",
     relationship: "",
     address: "",
+    livingStatus: "",
     minorDateOfBirth: "",
     email: "",
     phone: "",
@@ -797,7 +816,7 @@ function emptyInterestedPerson() {
     },
     service: {
       waiverStatus: "",
-      locationStatus: "known",
+      locationStatus: "",
       needsMailedNotice: false,
       protectedPerson: false
     }
@@ -805,7 +824,7 @@ function emptyInterestedPerson() {
 }
 
 function emptyWillBeneficiary() {
-  return { name: "", role: "beneficiary", relationship: "", address: "", minorDateOfBirth: "", notes: "" };
+  return { name: "", role: "beneficiary", relationship: "", address: "", livingStatus: "living", minorDateOfBirth: "", notes: "" };
 }
 
 function emptyHeirshipChild() {
@@ -882,23 +901,24 @@ function hasTrustInvolved(target = state) {
 }
 
 function normalizeInterestedPerson(person = {}) {
-  return mergeDeep(emptyInterestedPerson(), person);
+  return applyDeceasedPartyAddressDefault(mergeDeep(emptyInterestedPerson(), person));
 }
 
 function interestedPersonServiceStatus(person = {}, target = state) {
   const normalized = applyInterestedPersonInferences(person, {}, target);
   const roles = normalized.roles || {};
   const service = normalized.service || {};
-  const locationStatus = service.locationStatus || "known";
+  const locationStatus = service.locationStatus || "";
   const waiverStatus = service.waiverStatus || "";
-  const addressKnown = hasValue(normalized.address) && locationStatus === "known";
+  const locationAnswered = hasValue(locationStatus);
+  const addressKnown = partyHasRequiredMailingAddress(normalized) && locationStatus === "known";
   const protectedPerson = Boolean(service.protectedPerson || roles.minor || roles.needsGuardian || hasValue(normalized.minorDateOfBirth));
-  const missingAddress = locationStatus === "missing_address" || !addressKnown;
+  const missingAddress = locationStatus === "missing_address" || (locationAnswered && !addressKnown);
   const unknownOrMissing = ["cannot_locate", "unknown_person"].includes(locationStatus);
   const unableToWaive = ["cannot_sign", "will_not_sign", "not_eligible"].includes(waiverStatus) || protectedPerson;
-  const canSignWaiver = waiverStatus === "can_sign" && !unableToWaive && !unknownOrMissing;
+  const canSignWaiver = waiverStatus === "can_sign" && addressKnown && !unableToWaive && !unknownOrMissing;
   const needsMailedNotice = Boolean(service.needsMailedNotice || unableToWaive || unknownOrMissing);
-  const needsAttention = unknownOrMissing || unableToWaive || service.needsMailedNotice || missingAddress || !hasValue(waiverStatus);
+  const needsAttention = unknownOrMissing || unableToWaive || service.needsMailedNotice || missingAddress || !hasValue(waiverStatus) || !locationAnswered;
   const reasons = [];
   if (!hasValue(waiverStatus)) reasons.push("waiver status not answered");
   if (waiverStatus === "can_sign") reasons.push("will sign waiver");
@@ -906,9 +926,11 @@ function interestedPersonServiceStatus(person = {}, target = state) {
   if (waiverStatus === "will_not_sign") reasons.push("will not sign waiver");
   if (waiverStatus === "not_eligible") reasons.push("not eligible to sign waiver");
   if (waiverStatus === "unknown") reasons.push("waiver status unknown");
+  if (partyMarkedDeceased(normalized)) reasons.push("deceased party");
   if (protectedPerson) reasons.push("minor/protected-person review");
   if (roles.military) reasons.push("military-service review");
-  if (!addressKnown) reasons.push("mailing address not confirmed");
+  if (!locationAnswered && !partyMarkedDeceased(normalized)) reasons.push("address/location status not answered");
+  if (locationAnswered && !addressKnown && !partyMarkedDeceased(normalized)) reasons.push("mailing address not confirmed");
   if (locationStatus === "missing_address") reasons.push("address missing");
   if (locationStatus === "cannot_locate") reasons.push("cannot be located");
   if (locationStatus === "unknown_person") reasons.push("unknown or not reasonably ascertainable");
@@ -942,6 +964,7 @@ function interestedPersonServiceSummary(data = state) {
     mailedNoticeCount: statuses.filter((status) => status.needsMailedNotice).length,
     missingAddressCount: statuses.filter((status) => status.missingAddress).length,
     unansweredWaiverCount: statuses.filter((status) => !hasValue(status.person.service?.waiverStatus)).length,
+    unansweredLocationCount: statuses.filter((status) => !hasValue(status.person.service?.locationStatus)).length,
     rawUnansweredWaiverCount
   };
 }
@@ -959,7 +982,65 @@ function activeInterestedPersonsForNotice(target = state) {
 }
 
 function normalizeHeirshipChild(child = {}) {
-  return { ...emptyHeirshipChild(), ...child };
+  return applyDeceasedPartyAddressDefault({ ...emptyHeirshipChild(), ...child });
+}
+
+function normalizeWillBeneficiary(person = {}) {
+  return applyDeceasedPartyAddressDefault({ ...emptyWillBeneficiary(), ...person });
+}
+
+function partyMarkedDeceased(person = {}) {
+  const status = cleanText(person.livingStatus || person.status).toLowerCase();
+  if (["deceased", "dead", "predeceased"].includes(status)) return true;
+  const relationship = cleanText(person.relationship).toLowerCase();
+  if (/\b(descendant of deceased|parent of deceased|mother of deceased|father of deceased)\b/.test(relationship)) return false;
+  return /\b(deceased child|deceased spouse|deceased beneficiary|deceased interested person|predeceased child|predeceased beneficiary)\b/.test(relationship);
+}
+
+function isNotApplicableAddress(value = "") {
+  return /^n\s*\/?\s*a\.?$/i.test(cleanText(value));
+}
+
+function applyDeceasedPartyAddressDefault(person = {}) {
+  if (partyMarkedDeceased(person) && !hasValue(person.address)) person.address = NOT_APPLICABLE_ADDRESS;
+  return person;
+}
+
+function syncAddressForPartyLivingStatus(person = {}) {
+  if (partyMarkedDeceased(person)) {
+    applyDeceasedPartyAddressDefault(person);
+  } else if (isNotApplicableAddress(person.address)) {
+    person.address = "";
+  }
+  return person;
+}
+
+function applyLivingStatusAddressDefault(path = "") {
+  if (!path.endsWith(".livingStatus")) return;
+  const partyPath = path.replace(/\.livingStatus$/, "");
+  const party = getPath(partyPath);
+  if (!party || typeof party !== "object") return;
+  syncAddressForPartyLivingStatus(party);
+}
+
+function displayAddressForParty(person = {}) {
+  const normalized = applyDeceasedPartyAddressDefault({ ...person });
+  return normalized.address || "";
+}
+
+function partyHasRequiredMailingAddress(person = {}) {
+  const normalized = applyDeceasedPartyAddressDefault({ ...person });
+  if (!hasValue(normalized.address)) return false;
+  return !isNotApplicableAddress(normalized.address) || partyMarkedDeceased(normalized);
+}
+
+function livingStatusOptionsHtml(selected = "", includeBlank = true) {
+  return [
+    includeBlank ? ["", "Select"] : null,
+    ["living", "Living"],
+    ["deceased", "Deceased"],
+    ["unknown", "Unknown"]
+  ].filter(Boolean).map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`).join("");
 }
 
 function hasHeirshipChildContent(child = {}) {
@@ -1161,7 +1242,10 @@ function renderFields() {
   syncHeirshipChildrenList(state, { persist: false });
   syncEstateValueFields(state, { persist: false });
   syncPathRouterValueFields(state, { persist: false });
+  syncDomicileCountyFromEstateCounty(state, { persist: false });
   syncSurvivingSpouseFromSpouseHistory(state, { persist: false });
+  syncApplicantToPr(state, { persist: false });
+  syncPreparerFromSelectedSource(state, { persist: false });
   populateCountySelects();
   document.querySelectorAll("[data-path]").forEach((field) => {
     const value = getPath(field.dataset.path);
@@ -1180,12 +1264,16 @@ function bindFields() {
   document.querySelectorAll("[data-path]").forEach((field) => {
     const update = () => {
       const path = field.dataset.path;
+      const previousEstateCounty = path === "estate.county" ? state.estate.county : "";
       const value = field.type === "checkbox" ? field.checked : field.value;
       setPath(path, value);
       handleWillTrustGate(path, value);
       handleWillStatusDefaults(path, value);
       if ((path === "pr.sameAsApplicant" || path.startsWith("applicant.")) && state.pr.sameAsApplicant) {
         syncApplicantToPr();
+      }
+      if (path === "pr.sameAsApplicant" || path.startsWith("applicant.") || path.startsWith("pr.")) {
+        syncPreparerFromSelectedSource();
       }
       if (path === "pr.fullName" && !state.pr.sameAsApplicant && !state.requests.domiciliaryLettersTo) {
         state.requests.domiciliaryLettersTo = value;
@@ -1194,6 +1282,7 @@ function bindFields() {
       if (path.startsWith("countyDefaults.")) {
         applyCountyDefaults({ force: true });
       } else if (path === "estate.county") {
+        syncDomicileCountyFromEstateCounty(state, { previousEstateCounty, persist: false });
         syncCountyDefaultsFromCounty();
       }
       if (path === "estate.estimatedGrossValue") {
@@ -1255,6 +1344,24 @@ function syncApplicantToPr(target = state, options = {}) {
       target.requests.domiciliaryLettersTo = target.pr.fullName;
     }
   }
+  if (options.persist !== false) {
+    saveState();
+  }
+}
+
+function syncPreparerFromSelectedSource(target = state, options = {}) {
+  const sourceKey = target.ui?.preparerSource || "";
+  const source = sourceKey === "applicant"
+    ? target.applicant
+    : sourceKey === "pr"
+      ? target.pr
+      : null;
+  if (!source || !target.preparer) return;
+  target.preparer.fullName = source.fullName || "";
+  target.preparer.address = source.address || "";
+  target.preparer.email = source.email || "";
+  target.preparer.phone = source.phone || "";
+  target.preparer.barNumber = source.barNumber || "";
   if (options.persist !== false) {
     saveState();
   }
@@ -1344,7 +1451,7 @@ const interviewSteps = [
     id: "path-router",
     group: "Start",
     title: "Start your Wisconsin probate forms",
-    help: "Start free with the Wisconsin Probate Form Starter. The software keeps collecting useful facts whether Transfer by Affidavit, informal probate forms, or attorney review may be the next step.",
+    help: "Answer a few starter questions. The app will keep checking the likely Wisconsin probate path as more facts are entered.",
     render: renderProbatePathRouter,
     complete: () => probatePathRouterComplete(),
     statusMessage: () => probatePathRouterMessage(),
@@ -1365,17 +1472,16 @@ const interviewSteps = [
     id: "county",
     group: "Estate",
     title: "Where will this informal probate be filed?",
-    help: "Use one estimated probate-property value here. The app uses it for the PR-1801 value field and the Transfer by Affidavit warning.",
+    help: "Choose the Wisconsin county where the informal probate will be filed. This is usually the county where the decedent was domiciled at death. The app copies this county into the domicile county unless you change it later.",
     fields: [
-      { path: "estate.county", label: "Wisconsin county", type: "select", options: wisconsinCountyOptions },
-      { path: "estate.estimatedGrossValue", label: "Estimated probate property value", inputmode: "decimal", placeholder: "85000", required: false }
+      { path: "estate.county", label: "Wisconsin county", type: "select", options: wisconsinCountyOptions }
     ]
   },
   {
     id: "county-court-setup",
     group: "Estate",
-    title: "What should the app use for this county's court details?",
-    help: "These defaults flow into PR-1804 and PR-1805 so the same courthouse, probate office, registrar, and newspaper do not need to be typed repeatedly.",
+    title: "Confirm local court details for this county.",
+    help: "These details can be copied into PR-1804 and PR-1805. Use library defaults when available, then edit anything the county handles differently.",
     render: renderCountyCourtSetup,
     complete: () => countyDefaultsStatus().requiredMissing === 0,
     statusMessage: () => countyDefaultsMessage(),
@@ -1385,6 +1491,7 @@ const interviewSteps = [
     id: "other-proceedings",
     group: "Estate",
     title: "Are there any other estate proceedings pending?",
+    help: "This means another court case or formal process about this same decedent's estate, such as another probate case, a petition already filed in another county/state, or a related estate court proceeding. If you are not aware of anything already filed, choose No.",
     fields: [
       {
         path: "otherProceedings.status",
@@ -1404,21 +1511,23 @@ const interviewSteps = [
   {
     id: "decedent-basics",
     group: "Decedent",
-    title: "What is the decedent's name and date of death?",
+    title: "What is the decedent's (person who died) name and date of death?",
+    help: "The decedent is the person who died. These details identify the estate on the court forms.",
     fields: [
       { path: "decedent.fullName", label: "Full legal name", placeholder: "Jane A. Decedent" },
       { path: "decedent.dateOfDeath", label: "Date of death", type: "date" },
-      { path: "decedent.dateOfBirth", label: "Date of birth", type: "date", required: false }
+      { path: "decedent.dateOfBirth", label: "Date of birth", type: "date" }
     ]
   },
   {
     id: "decedent-domicile",
     group: "Decedent",
     title: "Where did the decedent live?",
+    help: "Domicile means the decedent's legal home at death. For most Wisconsin cases this will be the same county selected for filing, and the app fills it in automatically unless you change it.",
     fields: [
-      { path: "decedent.domicileCounty", label: "Domicile county", placeholder: "Milwaukee" },
+      { path: "decedent.domicileCounty", label: "County of legal residence at death", placeholder: "Milwaukee", help: "Usually the same as the filing county for a Wisconsin resident." },
       { path: "decedent.domicileState", label: "Domicile state", placeholder: "Wisconsin" },
-      { path: "decedent.lastMailingAddress", label: "Last mailing address", placeholder: ADDRESS_EXAMPLE, required: false }
+      { path: "decedent.lastMailingAddress", label: "Last mailing address", placeholder: ADDRESS_EXAMPLE }
     ]
   },
   {
@@ -1453,31 +1562,23 @@ const interviewSteps = [
     ]
   },
   {
-    id: "preparer",
-    group: "Applicant",
-    title: "Who is preparing these forms?",
-    help: "This fills the preparer/signature contact area on the generated forms. For most public users, it will be the applicant.",
-    render: renderGuidedPreparer,
-    complete: () => guidedPreparerComplete(),
-    statusMessage: () => guidedPreparerMessage(),
-    fields: []
-  },
-  {
     id: "personal-rep",
     group: "Personal Representative",
-    title: "Will you be serving as Personal Representative?",
+    title: "Will the applicant also be the Personal Representative (estate manager)?",
+    help: "The Personal Representative is the person asking the court for authority to manage the estate. In many informal probate cases, this is the same person as the applicant.",
     fields: [
       {
         path: "pr.sameAsApplicant",
+        label: "Should the app use the applicant as the proposed Personal Representative?",
         type: "choice",
         options: [
-          { label: "Yes, I will serve", value: true },
-          { label: "No, someone else", value: false }
+          { label: "Yes, use the applicant", value: true },
+          { label: "No, someone else will serve", value: false }
         ]
       },
       {
         path: "pr.isWisconsinResident",
-        label: "Is the proposed Personal Representative a Wisconsin resident?",
+        label: "Does the proposed Personal Representative live in Wisconsin?",
         type: "choice",
         options: [
           { label: "Yes", value: "yes" },
@@ -1501,8 +1602,8 @@ const interviewSteps = [
   {
     id: "resident-agent",
     group: "Personal Representative",
-    title: "Who is the Wisconsin resident agent?",
-    help: "If the proposed Personal Representative does not live in Wisconsin, PR-1807 asks for a Wisconsin resident agent. A resident agent is a Wisconsin resident who can receive probate papers for the nonresident PR. This software only collects the form information and does not decide who should serve.",
+    title: "Who is the Wisconsin resident agent for the out-of-state PR?",
+    help: "If the proposed Personal Representative does not live in Wisconsin, PR-1807 asks for a Wisconsin resident agent. The Personal Representative manages the estate. The resident agent is a Wisconsin resident who can receive probate papers for the nonresident PR. This software only collects the form information and does not decide who should serve.",
     visible: () => state.pr.isWisconsinResident === "no",
     fields: [
       { path: "pr.residentAgent.name", label: "Resident agent name" },
@@ -1512,9 +1613,20 @@ const interviewSteps = [
     ]
   },
   {
+    id: "preparer",
+    group: "Applicant",
+    title: "Who is preparing these forms?",
+    help: "This fills the preparer/signature contact area on the generated forms. For most public users, it will be the applicant.",
+    render: renderGuidedPreparer,
+    complete: () => guidedPreparerComplete(),
+    statusMessage: () => guidedPreparerMessage(),
+    fields: []
+  },
+  {
     id: "will-status",
     group: "Will",
     title: "Did the decedent leave a will?",
+    showNextAction: false,
     fields: [
       {
         path: "will.exists",
@@ -1532,6 +1644,7 @@ const interviewSteps = [
     group: "Will",
     title: "Tell us about the will.",
     visible: () => state.will.exists === "yes",
+    help: "A codicil is a later written change or addition to a will. If there are no later written changes to the will, choose No.",
     fields: [
       { path: "will.date", label: "Will date", type: "date" },
       {
@@ -1562,6 +1675,7 @@ const interviewSteps = [
     group: "Will",
     title: "What are the codicil dates?",
     visible: () => state.will.exists === "yes" && state.will.hasCodicils === "yes",
+    help: "Enter the date of each later written change or addition to the will. If there is more than one codicil, separate the dates with commas.",
     fields: [
       { path: "will.codicilDates", label: "Codicil date or dates", placeholder: "Separate multiple dates with commas" }
     ]
@@ -1591,7 +1705,9 @@ const interviewSteps = [
     id: "no-will",
     group: "Will",
     title: "Have you made diligent inquiry for a will?",
+    help: "PR-1801 asks the applicant to state that diligent inquiry was made and no unrevoked will was found. If you have not searched yet, pause and search before relying on the no-will path. This software does not decide whether a search is sufficient.",
     visible: () => state.will.exists === "no",
+    showNextAction: false,
     fields: [
       {
         path: "will.noWillDiligentInquiry",
@@ -1606,7 +1722,8 @@ const interviewSteps = [
   {
     id: "heirship-informant",
     group: "Heirship",
-    title: "Who can answer the family-tree questions?",
+    title: "Who will sign the Proof of Heirship?",
+    help: "Proof of Heirship is the family-tree form, PR-1806. It is signed by someone who can answer the decedent's spouse, children, and relative questions. This is often the applicant or proposed PR, but it can be someone else with the family information.",
     render: renderGuidedHeirshipInformant,
     complete: () => guidedHeirshipInformantComplete(),
     statusMessage: () => guidedHeirshipInformantMessage(),
@@ -1615,7 +1732,7 @@ const interviewSteps = [
   {
     id: "spouse",
     group: "Heirship",
-    title: "Was the decedent ever married or in a domestic partnership?",
+    title: "Was the decedent EVER married or in a domestic partnership?",
     help: "PR-1801 asks about spouse/domestic partner history. PR-1806 separately needs to know whether a spouse or domestic partner survived the decedent.",
     render: renderGuidedSpouseHistory,
     complete: () => guidedSpouseHistoryComplete(),
@@ -1809,8 +1926,8 @@ const interviewSteps = [
   {
     id: "opening-docs-ready",
     group: "Opening Path",
-    title: "Do you want to prepare the opening documents now?",
-    help: "The opening packet can be generated now, or you can continue to inventory and come back to forms later.",
+    title: "Opening packet checkpoint",
+    help: "Review any must-fix items here. If the packet is ready, click Next to go to final review before download.",
     render: renderOpeningDocsHandoff,
     complete: () => openingDocumentReadiness().ready,
     statusMessage: () => openingDocumentReadinessMessage(),
@@ -2091,6 +2208,7 @@ function bindModeControls() {
   document.getElementById("editModeBtn")?.addEventListener("click", () => setViewMode("edit"));
   document.getElementById("interviewEditBtn")?.addEventListener("click", () => setViewMode("edit"));
   document.getElementById("returnGuidedFromEditBtn")?.addEventListener("click", () => setViewMode("guided"));
+  document.getElementById("returnGuidedFromEditBottomBtn")?.addEventListener("click", () => setViewMode("guided"));
   document.getElementById("tasksShortcutBtn")?.addEventListener("click", openTaskTracker);
 }
 
@@ -2124,8 +2242,10 @@ function moveInterview(delta) {
 function goToInterviewStep(stepId) {
   const steps = visibleInterviewSteps();
   if (!steps.some((step) => step.id === stepId)) return;
+  state.ui.mode = "guided";
   state.ui.interviewStepId = stepId;
   saveState();
+  renderViewMode();
   renderInterview();
   scrollInterviewToTop();
 }
@@ -2136,6 +2256,75 @@ function scrollInterviewToTop() {
     target?.scrollIntoView({ block: "start" });
     window.scrollTo({ top: 0, left: 0 });
   });
+}
+
+function interviewNextActionText(step = {}, fields = []) {
+  const guidance = {
+    role: "Choose the option that best describes you, then click Next.",
+    "path-router": "Answer the starter questions, then click Next. Use your best estimate where needed; you can correct it later.",
+    "transfer-affidavit": "Answer the small-estate questions shown here. The download step appears only after the required items are complete.",
+    county: "Select the Wisconsin county where the probate will be filed, then click Next.",
+    "county-court-setup": "Use saved county defaults if available, review the court details, then click Next.",
+    "other-proceedings": "Choose No if you are not aware of another estate case already filed. If Yes, add a brief explanation, then click Next.",
+    "decedent-basics": "Enter the decedent's name, date of death, and date of birth, then click Next.",
+    "decedent-domicile": "Confirm the decedent's legal residence and last mailing address, then click Next.",
+    "decedent-benefits": "Answer each benefit question, or check that you lack information, then click Next.",
+    "applicant-name": "Enter your name, address, and relationship to the estate, then click Next.",
+    "applicant-contact": "Add contact information if available. Signature date can be left blank if unknown, then click Next.",
+    preparer: "Use applicant or proposed PR if correct, or edit the fields below, then click Next.",
+    "personal-rep": "Confirm whether the applicant will also be the Personal Representative, answer whether that person lives in Wisconsin, then click Next.",
+    "personal-rep-details": "Enter the proposed Personal Representative's information, then click Next.",
+    "resident-agent": "Enter the Wisconsin resident agent for the out-of-state PR, then click Next.",
+    "will-status": "Choose whether there is a will. If you are not sure, choose Not sure, then click Next.",
+    "will-details": "Enter the will date, codicil answer, and original-will status, then click Next.",
+    codicils: "Enter each codicil date you know, then click Next.",
+    "will-names": "Review any people named for roles in the will. Select existing people when possible, then click Next.",
+    "will-beneficiaries": "Add people or organizations who receive property under the will, then click Next.",
+    "no-will": "Confirm whether a diligent search found no unrevoked will, then click Next.",
+    "heirship-informant": "Choose who can answer and sign the family-tree form, then click Next.",
+    spouse: "Answer the spouse/domestic partner questions shown on this screen, then click Next.",
+    "spouse-benefits": "Answer these spouse/domestic partner benefit questions if they apply, then click Next.",
+    children: "Answer whether there were children. If Yes, add each living or deceased child, then click Next.",
+    "blended-family": "Answer whether all children are also children of the surviving spouse/domestic partner, then click Next.",
+    "fallback-relatives": "Answer the relatives questions only if they apply to this family tree, then click Next.",
+    survivorship: "Answer whether anyone died within 120 hours after the decedent, then click Next.",
+    "people-roster": "Review the people collected so far. This is a roster check, not the final interested-person list. Click Next if it looks right.",
+    "interested-person": "Review the interested persons the app added from your answers. Remove anyone who should not be listed or add someone missing, then click Next.",
+    "interested-details": "Confirm each interested person's name, role, mailing address, and minor/protected-person details. Add another person only if someone is missing, then click Next.",
+    "interested-service": "For each listed person, answer whether they will sign a waiver or need notice/service review, then click Next.",
+    "interested-source-review": "Next step: make sure the interested-person list is complete. Review the cards below. If a yellow suggested card should be included, click Add this person to the list. If the list looks accurate, click Next.",
+    "address-contact-review": "Fix any missing mailing addresses shown here. If the addresses look complete, click Next.",
+    "opening-path": "Answer the waiver and notice questions. The app will use those answers to choose the opening packet path, then click Next.",
+    "attorney-handoff": "Review the attorney-review warning and optional information summary. Nothing is shared with an attorney unless the user chooses to export it.",
+    "opening-docs-ready": "Review the must-fix items. If the packet is ready, click Next to go to final review.",
+    "final-review-download": "Review the packet, check the acknowledgement, unlock the download, then continue to filing instructions.",
+    "opening-filing-instructions": "Use this page as the filing handoff. Download, print, sign, serve, publish, or wait as instructed, then click Next when ready.",
+    "post-opening-handoff": "If domiciliary letters have issued, enter the dates and deadlines. If not, you can come back later.",
+    "inventory-starter": "Add starter inventory items if you are ready. Otherwise you can continue and return after letters issue.",
+    review: "Review the live warnings and available downloads. Click any warning to jump back to the section that needs attention."
+  };
+  if (guidance[step.id]) return guidance[step.id];
+  const requiredFields = fields.filter((field) => field.required !== false);
+  if (requiredFields.length) {
+    const unanswered = requiredFields.filter((field) => !fieldHasAnswer(field)).length;
+    return unanswered
+      ? "Fill in the required fields marked * required, then click Next."
+      : "Review the answers on this screen. If they look accurate, click Next.";
+  }
+  if (typeof step.render === "function") {
+    return "Review this screen. Use any buttons only if something needs to be added or fixed, then click Next.";
+  }
+  return "Review this screen, then click Next.";
+}
+
+function renderInterviewNextAction(step = {}, fields = []) {
+  const action = document.createElement("div");
+  action.className = "next-action-card";
+  action.innerHTML = `
+    <strong>Next step</strong>
+    <p>${escapeHtml(interviewNextActionText(step, fields))}</p>
+  `;
+  return action;
 }
 
 function renderInterview() {
@@ -2156,10 +2345,20 @@ function renderInterview() {
   helpElement.innerHTML = step.help
     ? `<details class="interview-help-details"><summary>Why this matters</summary><p>${escapeHtml(step.help)}</p></details>`
     : "";
-  document.getElementById("interviewStepMeta").textContent = `Step ${index + 1} of ${steps.length}`;
-  card.innerHTML = "";
-
   const fields = visibleInterviewFields(step);
+  const requiredFields = fields.filter((field) => field.required !== false);
+  const requiredAnswered = requiredFields.filter(fieldHasAnswer).length;
+  const stepKind = typeof step.render === "function"
+    ? "Review/action screen"
+    : requiredFields.length
+      ? `${requiredAnswered}/${requiredFields.length} required answer${requiredFields.length === 1 ? "" : "s"}`
+      : "Information review";
+  document.getElementById("interviewStepMeta").textContent = `Step ${index + 1} of ${steps.length} - ${stepKind}`;
+  card.innerHTML = "";
+  if (step.showNextAction !== false) {
+    card.appendChild(renderInterviewNextAction(step, fields));
+  }
+
   if (typeof step.render === "function") {
     card.appendChild(step.render());
   } else if (!fields.length) {
@@ -2186,7 +2385,16 @@ function renderInterviewField(field) {
   }
   const label = document.createElement("label");
   label.className = "interview-label";
-  label.textContent = field.label || "";
+  const labelText = document.createElement("span");
+  labelText.className = "label-text";
+  labelText.textContent = field.label || "";
+  if (field.required !== false) {
+    const marker = document.createElement("span");
+    marker.className = "required-marker";
+    marker.textContent = " * required";
+    labelText.appendChild(marker);
+  }
+  label.appendChild(labelText);
   const control = field.type === "textarea" ? document.createElement("textarea") : document.createElement(field.type === "select" ? "select" : "input");
   control.dataset.interviewPath = field.path;
   if (field.type && !["select", "textarea"].includes(field.type)) control.type = field.type;
@@ -2240,6 +2448,12 @@ function renderChoiceField(field) {
     const label = document.createElement("div");
     label.className = "interview-choice-label";
     label.textContent = field.label;
+    if (field.required !== false) {
+      const marker = document.createElement("span");
+      marker.className = "required-marker";
+      marker.textContent = " * required";
+      label.appendChild(marker);
+    }
     wrapper.appendChild(label);
   }
   const choices = document.createElement("div");
@@ -2264,11 +2478,15 @@ function valuesEqual(first, second) {
 }
 
 function updateInterviewState(path, value, options = {}) {
+  const previousEstateCounty = path === "estate.county" ? state.estate.county : "";
   setPath(path, value);
   handleWillTrustGate(path, value);
   handleWillStatusDefaults(path, value);
   if ((path === "pr.sameAsApplicant" || path.startsWith("applicant.")) && state.pr.sameAsApplicant) {
     syncApplicantToPr();
+  }
+  if (path === "pr.sameAsApplicant" || path.startsWith("applicant.") || path.startsWith("pr.")) {
+    syncPreparerFromSelectedSource();
   }
   if (path === "pr.fullName" && !state.pr.sameAsApplicant && !state.requests.domiciliaryLettersTo) {
     state.requests.domiciliaryLettersTo = value;
@@ -2277,6 +2495,7 @@ function updateInterviewState(path, value, options = {}) {
   if (path.startsWith("countyDefaults.")) {
     applyCountyDefaults({ force: true });
   } else if (path === "estate.county") {
+    syncDomicileCountyFromEstateCounty(state, { previousEstateCounty, persist: false });
     syncCountyDefaultsFromCounty();
   }
   if (path === "estate.estimatedGrossValue") {
@@ -2434,7 +2653,7 @@ function renderInterviewSummary() {
       <span>${escapeHtml(value)}</span>
     </div>
   `).join("");
-  const route = probatePathDecision();
+  const route = probatePathDisplayDecision();
   const opening = openingPathDecision();
   const routeTone = route.tone === "bad" ? "bad" : route.tone === "warn" ? "warn" : "";
   pathSummary.className = `path-card mini ${routeTone}`;
@@ -2458,9 +2677,22 @@ function heirshipSummaryText() {
   return `${spouse}, ${children}`;
 }
 
+function publicBenefitsRouteAnswer(data = state) {
+  const benefits = data.benefits || {};
+  if (benefits.lackInfo) return "unknown";
+  const programKeys = ["medicalAssistance", "familyCare", "communityOptions", "chronicDisease", "institution"];
+  if (programKeys.some((key) => ["did", "was", "yes", true].includes(benefits[key]))) return "yes";
+  if (programKeys.every((key) => hasValue(benefits[key]))) return "no";
+  const routerValue = data.pathRouter?.publicBenefits;
+  if (routerValue === "yes" || routerValue === "no") return routerValue;
+  if (routerValue === "unknown") return "unknown";
+  return "";
+}
+
 function probatePathDecision(data = state) {
   const router = data.pathRouter || {};
   const grossValue = numberValue(router.grossValue || data.estate?.estimatedGrossValue || data.estate?.estimatedNetValue);
+  const publicBenefitsAnswer = publicBenefitsRouteAnswer(data);
   const reviewReasons = [];
   const missingAnswers = [];
   const reviewFlags = [
@@ -2487,9 +2719,6 @@ function probatePathDecision(data = state) {
   if (!hasValue(router.hasRealEstate) || router.hasRealEstate === "unknown") {
     missingAnswers.push("Real estate status is not confirmed.");
   }
-  if (!hasValue(router.publicBenefits) || router.publicBenefits === "unknown") {
-    missingAnswers.push("Public-benefits status is not confirmed.");
-  }
   if (!grossValue) {
     missingAnswers.push("Estimated probate-property value is needed for the Wisconsin Probate Check.");
   }
@@ -2509,11 +2738,11 @@ function probatePathDecision(data = state) {
   if (grossValue && grossValue <= 50000) {
     const reasons = ["Estimated probate property is $50,000 or less."];
     if (router.hasRealEstate === "yes") reasons.push("Real estate may require recording and title follow-up even if the affidavit route fits.");
-    if (router.publicBenefits === "yes") reasons.push("Public benefits may require estate-recovery notice or review before transfer.");
+    if (publicBenefitsAnswer === "yes") reasons.push("Public benefits may require estate-recovery notice or review before transfer.");
     if (missingAnswers.length) reasons.push("Confirm the remaining route answers before relying on this result.");
     return {
       key: "transfer_affidavit",
-      tone: missingAnswers.length || router.publicBenefits === "yes" ? "warn" : "ok",
+      tone: missingAnswers.length || publicBenefitsAnswer === "yes" ? "warn" : "ok",
       title: "You may be able to use Wisconsin Transfer by Affidavit.",
       summary: "Based on your answers, the estate may fit Wisconsin's simplified affidavit process. The software can help prepare a Transfer by Affidavit package and checklist for eligible situations.",
       detail: "Before you download, review the information included, missing items, and final price.",
@@ -2545,14 +2774,59 @@ function probatePathDecision(data = state) {
   };
 }
 
-function probatePathRouterComplete() {
-  const router = state.pathRouter || {};
-  return ["grossValue", "hasRealEstate", "allInterestedKnown", "allAdultsCapable", "everyoneAgrees", "publicBenefits", "creditorDispute", "formalConcern"]
+function probatePathRouterComplete(data = state) {
+  const router = data.pathRouter || {};
+  return ["grossValue", "hasRealEstate", "allInterestedKnown", "allAdultsCapable", "everyoneAgrees", "creditorDispute", "formalConcern"]
     .every((key) => hasValue(router[key]) && router[key] !== "unknown");
 }
 
+function probateIntakeCommitmentStatus(data = state) {
+  const benefits = data.benefits || {};
+  const heirship = data.heirship || {};
+  const benefitKeys = ["medicalAssistance", "familyCare", "communityOptions", "chronicDisease", "institution"];
+  const benefitAnswered = benefitKeys.every((key) => hasValue(benefits[key])) || benefits.lackInfo;
+  const checks = [
+    ["County", cleanText(data.estate?.county)],
+    ["Decedent", cleanText(data.decedent?.fullName) && cleanText(data.decedent?.dateOfDeath)],
+    ["Applicant", cleanText(data.applicant?.fullName) && cleanText(data.applicant?.address)],
+    ["Will status", hasValue(data.will?.exists)],
+    ["Spouse question", hasValue(heirship.spouse?.exists) || hasValue(data.spouse?.everMarried)],
+    ["Children question", hasValue(heirship.children?.exists)],
+    ["Public benefits", benefitAnswered],
+    ["Interested persons", (data.interestedPersons || []).some(hasInterestedPersonContent)]
+  ];
+  const completed = checks.filter(([, value]) => Boolean(value)).length;
+  return {
+    completed,
+    total: checks.length,
+    ready: completed >= 5,
+    missingLabels: checks.filter(([, value]) => !Boolean(value)).map(([label]) => label)
+  };
+}
+
+function probatePathDecisionReadyForUser(data = state) {
+  return probatePathRouterComplete(data) && probateIntakeCommitmentStatus(data).ready;
+}
+
+function probatePathDisplayDecision(data = state) {
+  const decision = probatePathDecision(data);
+  if (probatePathDecisionReadyForUser(data)) return decision;
+  const commitment = probateIntakeCommitmentStatus(data);
+  return {
+    key: "intake_in_progress",
+    tone: "",
+    title: "Keep going.",
+    summary: "The app needs a few more answers before showing a final path check.",
+    detail: `Case information started: ${commitment.completed}/${commitment.total} key areas.`,
+    reasons: [
+      "Continue entering the estate, family, asset, and interested-person information."
+    ],
+    productKey: "informal_probate"
+  };
+}
+
 function probatePathRouterMessage() {
-  const decision = probatePathDecision();
+  const decision = probatePathDisplayDecision();
   if (!probatePathRouterComplete()) return decision.detail || "Answer the Wisconsin Probate Check questions to improve the result.";
   return decision.summary;
 }
@@ -2561,7 +2835,7 @@ function routeResultHtml(decision = probatePathDecision()) {
   const reasonRows = (decision.reasons || []).slice(0, 4).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("");
   return `
     <div class="route-result ${escapeAttr(decision.tone)}">
-      <p class="eyebrow">Your Wisconsin probate result</p>
+      <p class="eyebrow">Current path check</p>
       <h3>${escapeHtml(decision.title)}</h3>
       <p>${escapeHtml(decision.summary)}</p>
       ${reasonRows ? `<ul>${reasonRows}</ul>` : ""}
@@ -2570,10 +2844,21 @@ function routeResultHtml(decision = probatePathDecision()) {
   `;
 }
 
-function productLadderHtml() {
-  const route = probatePathDecision();
-  const productKeys = ["transfer_affidavit", "informal_probate"];
-  if (route.key === "attorney_review") productKeys.push("information_summary");
+function intakeCommitmentCardHtml() {
+  const commitment = probateIntakeCommitmentStatus();
+  const missing = commitment.missingLabels.slice(0, 3).map((label) => `<li>${escapeHtml(label)}</li>`).join("");
+  return `
+    <div class="guided-note intake-commitment-card">
+      <h3>Keep going.</h3>
+      <p>${escapeHtml(commitment.completed)}/${escapeHtml(commitment.total)} key intake areas started.</p>
+      ${missing ? `<ul>${missing}</ul>` : ""}
+    </div>
+  `;
+}
+
+function productLadderHtml(decision = probatePathDecision()) {
+  const route = decision;
+  const productKeys = ["transfer_affidavit", "informal_probate", "information_summary"];
   if (FEATURE_ATTORNEY_HANDOFF) productKeys.push("attorney_handoff");
   return `
     <div class="product-ladder">
@@ -2624,23 +2909,26 @@ function bindProductLadder(root) {
 
 function pathRouterStarted() {
   const router = state.pathRouter || {};
-  return ["grossValue", "hasRealEstate", "allInterestedKnown", "allAdultsCapable", "everyoneAgrees", "publicBenefits", "creditorDispute", "formalConcern"].some((key) => hasValue(router[key]));
+  return ["grossValue", "hasRealEstate", "allInterestedKnown", "allAdultsCapable", "everyoneAgrees", "creditorDispute", "formalConcern"].some((key) => hasValue(router[key]));
 }
 
 function probateStartHeroHtml() {
   return `
-    <div class="probate-start-hero">
-      <div>
-        <p class="eyebrow">Wisconsin probate starter</p>
-        <h3>Start free. Answer a few questions. Build the right packet.</h3>
-        <p>The interview will help decide whether this looks like Transfer by Affidavit, informal probate, or a case that should be reviewed before documents are filed.</p>
-      </div>
-      <div class="start-hero-steps">
-        <span><strong>1</strong> Answer starter questions</span>
-        <span><strong>2</strong> Complete the guided intake</span>
-        <span><strong>3</strong> Unlock, print, sign, and file</span>
-      </div>
+    <div class="service-focus-card">
+      <h3>Start here.</h3>
+      <p>Answer these starter questions, then click Next. You can update these answers later.</p>
       <p class="helper-text">${escapeHtml(LEGAL_DISCLAIMER_SHORT)}</p>
+    </div>
+  `;
+}
+
+function compactRouteReviewNoticeHtml(decision = probatePathDecision()) {
+  const reasonRows = (decision.reasons || []).slice(0, 2).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("");
+  return `
+    <div class="route-result bad">
+      <h3>Review may be needed.</h3>
+      <p>${escapeHtml(decision.summary)}</p>
+      ${reasonRows ? `<ul>${reasonRows}</ul>` : ""}
     </div>
   `;
 }
@@ -2648,11 +2936,12 @@ function probateStartHeroHtml() {
 function renderProbatePathRouter() {
   const decision = probatePathDecision();
   const started = pathRouterStarted();
+  const showReviewNotice = started && probatePathRouterComplete() && decision.key === "attorney_review";
+  const showIssueNotes = state.pathRouter.formalConcern === "yes" || state.pathRouter.creditorDispute === "yes";
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat path-router-screen";
   wrapper.innerHTML = `
     ${probateStartHeroHtml()}
-    ${started ? routeResultHtml(decision) : ""}
     <div class="guided-person-card">
       <h3>About how much probate property is involved?</h3>
       <p>Use a rough gross value for assets that would need probate transfer. This can be corrected later.</p>
@@ -2662,9 +2951,14 @@ function renderProbatePathRouter() {
         <span class="start-input-badge">Start here</span>
         <h3>Enter the estimated probate property value</h3>
       </div>
-      <label class="interview-label">Estimated probate property value
-        <input class="starter-money-input" data-guided-path="pathRouter.grossValue" value="${escapeAttr(state.pathRouter.grossValue || state.estate.estimatedGrossValue)}" inputmode="decimal" placeholder="85000" />
+      <label class="interview-label">Estimated gross probate property value
+        <input class="starter-money-input" data-guided-path="pathRouter.grossValue" value="${escapeAttr(state.pathRouter.grossValue || state.estate.estimatedGrossValue)}" inputmode="decimal" placeholder="Enter value of estate" />
       </label>
+      <details class="compact-help">
+        <summary>What should I include?</summary>
+        <p>Include assets that appear to need probate transfer, such as bank accounts, vehicles, real estate, and personal property titled only in the decedent's name. If you are unsure, enter your best rough estimate now and correct it later.</p>
+        <p>For vehicles, use a rough resale or trade-in value if the vehicle appears to be probate property. For real estate, a tax-assessment or market estimate is enough for this early screen.</p>
+      </details>
     </div>
     <div class="route-question">
       <h3>Does the probate property include Wisconsin real estate?</h3>
@@ -2699,14 +2993,6 @@ function renderProbatePathRouter() {
       </div>
     </div>
     <div class="route-question">
-      <h3>Did the decedent receive Medicaid, Family Care, or similar public benefits?</h3>
-      <div class="choice-grid">
-        ${guidedChoiceButtonHtml("pathRouter.publicBenefits", "no", "No")}
-        ${guidedChoiceButtonHtml("pathRouter.publicBenefits", "yes", "Yes")}
-        ${guidedChoiceButtonHtml("pathRouter.publicBenefits", "unknown", "Not sure")}
-      </div>
-    </div>
-    <div class="route-question">
       <h3>Are there creditor disputes, objections, unclear title issues, or litigation concerns?</h3>
       <div class="choice-grid">
         ${guidedChoiceButtonHtml("pathRouter.creditorDispute", "no", "No")}
@@ -2715,20 +3001,18 @@ function renderProbatePathRouter() {
       </div>
     </div>
     <div class="route-question">
-      <h3>Do you already think a judge or attorney may need to review this?</h3>
+      <h3>Do you know of any dispute or issue that may require attorney or court review?</h3>
       <div class="choice-grid">
-        ${guidedChoiceButtonHtml("pathRouter.formalConcern", "no", "No")}
-        ${guidedChoiceButtonHtml("pathRouter.formalConcern", "yes", "Yes")}
-        ${guidedChoiceButtonHtml("pathRouter.formalConcern", "unknown", "Not sure")}
+        ${guidedChoiceButtonHtml("pathRouter.formalConcern", "no", "No known issue")}
+        ${guidedChoiceButtonHtml("pathRouter.formalConcern", "yes", "Yes, there may be an issue")}
       </div>
     </div>
-    <label class="interview-label">Route notes
-      <textarea rows="3" data-guided-path="pathRouter.notes" placeholder="Anything unusual about the estate, family, property, or creditor situation">${escapeHtml(state.pathRouter.notes)}</textarea>
-    </label>
-    ${started ? productLadderHtml() : ""}
-    <div class="guided-note">
-      <p>This starts the probate intake. The detailed interview still checks waivers, PR-1805 notice, missing information, and attorney-review warnings before any final packet is downloaded.</p>
-    </div>
+    ${showIssueNotes ? `
+      <label class="interview-label">Brief note about the issue (optional)
+        <textarea rows="3" data-guided-path="pathRouter.notes" placeholder="Example: disagreement about who should serve, missing person, creditor dispute, unclear title">${escapeHtml(state.pathRouter.notes)}</textarea>
+      </label>
+    ` : ""}
+    ${showReviewNotice ? compactRouteReviewNoticeHtml(decision) : ""}
   `;
   bindGuidedPathInputs(wrapper);
   bindGuidedChoiceButtons(wrapper);
@@ -2798,7 +3082,7 @@ function transferAffidavitReadiness(data = state) {
     if (tba.realEstateHeirNoticeComplete !== "yes") blockers.push("Real estate transfers require heir notice at least 30 days before recording or waivers from heirs.");
   }
   if (tba.vehicleIncluded === "yes") warnings.push("Vehicle transfer may require DMV-specific title steps in addition to the affidavit package.");
-  if (data.pathRouter?.publicBenefits === "yes" || tba.publicBenefitsFollowup === "yes") {
+  if (publicBenefitsRouteAnswer(data) === "yes" || tba.publicBenefitsFollowup === "yes") {
     warnings.push("Public-benefits or estate-recovery issues should be reviewed before transfer.");
     if (tba.estateRecoveryNoticeSent !== "yes") blockers.push("If listed public benefits were received, send required notice to the Wisconsin Estate Recovery Program before transfer.");
   }
@@ -3094,13 +3378,13 @@ function guidedBenefitsComplete() {
     state.benefits.chronicDisease,
     state.benefits.institution
   ];
-  if (state.benefits.lackInfo) return hasValue(state.benefits.explanation);
+  if (state.benefits.lackInfo) return true;
   if (required.some((value) => !hasValue(value))) return false;
   return !benefitsNeedExplanation() || hasValue(state.benefits.explanation);
 }
 
 function guidedBenefitsMessage() {
-  if (state.benefits.lackInfo && !hasValue(state.benefits.explanation)) return "Briefly explain what information is missing.";
+  if (state.benefits.lackInfo) return "";
   const missing = [
     state.benefits.medicalAssistance,
     state.benefits.familyCare,
@@ -3123,8 +3407,12 @@ function renderGuidedBenefits() {
   wrapper.innerHTML = `
     <div class="guided-person-card">
       <h3>Public benefits received by the decedent</h3>
-      <p>Answer these for PR-1801 question 5. If you do not know yet, mark that you lack information and add a short note.</p>
+      <p>Answer these for PR-1801 question 5. If you do not know yet, mark that you lack information and continue.</p>
     </div>
+    <label class="checkline prominent-checkline">
+      <input type="checkbox" data-guided-path="benefits.lackInfo" ${state.benefits.lackInfo ? "checked" : ""} />
+      I lack information to complete this section
+    </label>
     <div class="benefit-question">
       <h3>Medical Assistance or Medicaid</h3>
       <div class="choice-grid">
@@ -3160,13 +3448,10 @@ function renderGuidedBenefits() {
         ${benefitChoiceHtml("benefits.institution", "was_not", "Was not a patient or inmate")}
       </div>
     </div>
-    <label class="checkline">
-      <input type="checkbox" data-guided-path="benefits.lackInfo" ${state.benefits.lackInfo ? "checked" : ""} />
-      I lack information to complete this section
-    </label>
     ${benefitsNeedExplanation() ? `
-      <label class="interview-label">Explanation
-        <input data-guided-path="benefits.explanation" value="${escapeAttr(state.benefits.explanation)}" placeholder="Benefit received, institution, or information missing" />
+      <label class="interview-label">Explanation ${state.benefits.lackInfo ? "(optional)" : ""}
+        <input data-guided-path="benefits.explanation" value="${escapeAttr(state.benefits.explanation)}" placeholder="${state.benefits.lackInfo ? "Optional: what information is missing, if known" : "Benefit received, institution, or information missing"}" />
+        ${state.benefits.lackInfo ? `<span class="field-hint">Optional. You can leave this blank if you do not know what is missing yet.</span>` : ""}
       </label>
     ` : ""}
   `;
@@ -3371,7 +3656,8 @@ function existingParties() {
     const normalized = normalizeHeirshipChild(child);
     addExistingParty(parties, {
       name: normalized.name,
-      address: normalized.address || (sameName(normalized.name, state.applicant.fullName) ? state.applicant.address : ""),
+      address: displayAddressForParty(normalized) || (sameName(normalized.name, state.applicant.fullName) ? state.applicant.address : ""),
+      livingStatus: normalized.livingStatus,
       relationship: relationshipText([
         "Child/descendant",
         normalized.livingStatus === "deceased" ? "deceased" : "",
@@ -3421,31 +3707,53 @@ function existingParties() {
       });
     }
     if (state.will.hasNamedBeneficiaries === "yes") {
-      state.willBeneficiaries.forEach((person) => addExistingParty(parties, {
-        name: person.name,
-        address: person.address,
-        relationship: relationshipText([beneficiaryRoleLabel(person.role), person.relationship]),
-        minorDateOfBirth: person.minorDateOfBirth,
-        source: "Will beneficiaries"
-      }));
+      state.willBeneficiaries.forEach((person) => {
+        const normalized = normalizeWillBeneficiary(person);
+        addExistingParty(parties, {
+          name: normalized.name,
+          address: displayAddressForParty(normalized),
+          livingStatus: normalized.livingStatus,
+          relationship: relationshipText([beneficiaryRoleLabel(normalized.role), normalized.relationship, partyMarkedDeceased(normalized) ? "deceased" : ""]),
+          minorDateOfBirth: normalized.minorDateOfBirth,
+          source: "Will beneficiaries"
+        });
+      });
     }
   }
-  state.interestedPersons.forEach((person) => addExistingParty(parties, {
-    name: person.name,
-    address: person.address,
-    email: person.email,
-    phone: person.phone,
-    relationship: interestedRelationship(person),
-    minorDateOfBirth: person.minorDateOfBirth,
-    roles: normalizeInterestedPerson(person).roles,
-    source: "Interested persons"
-  }));
+  state.interestedPersons.forEach((person) => {
+    const normalized = normalizeInterestedPerson(person);
+    addExistingParty(parties, {
+      name: normalized.name,
+      address: displayAddressForParty(normalized),
+      livingStatus: normalized.livingStatus,
+      email: normalized.email,
+      phone: normalized.phone,
+      relationship: relationshipText([interestedRelationship(normalized), partyMarkedDeceased(normalized) ? "deceased" : ""]),
+      minorDateOfBirth: normalized.minorDateOfBirth,
+      roles: normalized.roles,
+      source: "Interested persons"
+    });
+  });
   return parties;
 }
 
 function masterPeopleRoster() {
   const suggestions = interestedPersonSuggestions();
-  return existingParties().map((party) => {
+  const parties = existingParties();
+  suggestions.forEach((suggestion) => {
+    if (parties.some((party) => sameName(party.name, suggestion.name))) return;
+    const enriched = enrichInterestedSuggestion(suggestion);
+    parties.push({
+      name: enriched.name,
+      address: displayAddressForParty(enriched),
+      livingStatus: enriched.livingStatus,
+      relationship: enriched.relationship,
+      minorDateOfBirth: enriched.minorDateOfBirth,
+      roles: enriched.roles || {},
+      source: enriched.source || "Interested-person suggestion"
+    });
+  });
+  return parties.map((party) => {
     const matchingSuggestion = suggestions.find((suggestion) => sameName(suggestion.name, party.name));
     const interestedIndex = existingInterestedPersonIndex(party.name);
     const suggestionLike = matchingSuggestion || {
@@ -3467,7 +3775,7 @@ function masterPeopleRoster() {
       suggestion: suggestionLike,
       suggestedInterestedPerson: Boolean(matchingSuggestion),
       interestedIndex,
-      missingAddress: !hasValue(party.address),
+      missingAddress: !partyHasRequiredMailingAddress(party),
       missingContact: !hasValue(party.email) && !hasValue(party.phone),
       sources: splitSourceParts(party.source),
       reasons
@@ -3498,8 +3806,93 @@ function peopleRosterMessage() {
   const status = peopleRosterStatus();
   if (!status.total) return "Enter applicant, will, or heirship answers to start the people roster.";
   if (status.missingSuggested) return `${status.missingSuggested} suggested interested person${status.missingSuggested === 1 ? "" : "s"} not yet added.`;
-  if (status.missingAddress) return `${status.missingAddress} person${status.missingAddress === 1 ? "" : "s"} still need a mailing address somewhere in the file.`;
   return "";
+}
+
+function rosterCaseSnapshotHtml() {
+  const items = [
+    {
+      tone: "decedent",
+      label: "Decedent",
+      name: state.decedent.fullName || "Decedent name not entered",
+      detail: relationshipText([state.decedent.dateOfDeath ? `Died ${documentDate(state.decedent.dateOfDeath)}` : "", state.estate.county || "County not selected"]),
+      address: state.decedent.lastMailingAddress || "Address not entered"
+    },
+    {
+      tone: "applicant",
+      label: "Applicant",
+      name: state.applicant.fullName || "Applicant not entered",
+      detail: state.applicant.capacity || "Role not entered",
+      address: state.applicant.address || "Address not entered"
+    },
+    {
+      tone: "pr",
+      label: "Proposed PR",
+      name: state.pr.fullName || "Proposed PR not entered",
+      detail: state.pr.isWisconsinResident === "no" ? "Nonresident PR" : state.pr.isWisconsinResident === "yes" ? "Wisconsin resident" : "Residency not answered",
+      address: state.pr.address || "Address not entered"
+    }
+  ];
+  return `
+    <div class="roster-snapshot">
+      ${items.map((item) => `
+        <section class="roster-snapshot-card ${escapeAttr(item.tone)}">
+          <span>${escapeHtml(item.label)}</span>
+          <h3>${escapeHtml(item.name)}</h3>
+          <p>${escapeHtml(item.detail || "Details not entered")}</p>
+          <small>${escapeHtml(item.address)}</small>
+        </section>
+      `).join("")}
+    </div>
+  `;
+}
+
+function rosterGroupKey(person = {}) {
+  const source = cleanText(person.source).toLowerCase();
+  const relationship = cleanText(person.relationship).toLowerCase();
+  if (source.includes("applicant") || source.includes("personal representative") || relationship.includes("personal representative") || relationship.includes("resident agent")) return "caseRoles";
+  if (source.includes("heirship") || relationship.includes("spouse") || relationship.includes("child") || relationship.includes("parent") || relationship.includes("sibling") || relationship.includes("descendant")) return "family";
+  if (source.includes("will") || relationship.includes("beneficiary") || relationship.includes("trustee")) return "will";
+  if (source.includes("interested")) return "interested";
+  return "other";
+}
+
+function rosterGroupMeta(key) {
+  const meta = {
+    caseRoles: { title: "Applicant and proposed PR", detail: "People connected to preparing or serving in the case.", tone: "case" },
+    family: { title: "Family and heirship", detail: "Spouse, children, descendants, parents, siblings, or other family-tree answers.", tone: "family" },
+    will: { title: "Will and trust roles", detail: "People or entities named in the will, codicil, or will-created trust answers.", tone: "will" },
+    interested: { title: "Interested-person list", detail: "People already placed in the active waiver, notice, or service list.", tone: "interested" },
+    other: { title: "Other people or entities", detail: "Additional people found in the answers.", tone: "other" }
+  };
+  return meta[key] || meta.other;
+}
+
+function groupedRosterHtml(people = []) {
+  const groups = ["caseRoles", "family", "will", "interested", "other"].map((key) => ({ key, meta: rosterGroupMeta(key), people: [] }));
+  people.forEach((person, index) => {
+    const key = rosterGroupKey(person);
+    const group = groups.find((item) => item.key === key) || groups[groups.length - 1];
+    group.people.push({ person, index });
+  });
+  const nonEmpty = groups.filter((group) => group.people.length);
+  if (!nonEmpty.length) {
+    return `<div class="suggestion-empty">No people have been entered yet. Start with the applicant, proposed PR, will, and heirship questions.</div>`;
+  }
+  return nonEmpty.map((group) => `
+    <section class="roster-section ${escapeAttr(group.meta.tone)}">
+      <div class="roster-section-heading">
+        <div>
+          <h3>${escapeHtml(group.meta.title)}</h3>
+          <p>${escapeHtml(group.meta.detail)}</p>
+        </div>
+        <span class="badge">${group.people.length}</span>
+      </div>
+      <div class="roster-list">
+        ${group.people.map(({ person, index }) => rosterPersonCardHtml(person, index)).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 function renderMasterPeopleRoster() {
@@ -3519,21 +3912,14 @@ function renderMasterPeopleRoster() {
         <span>${status.missingSuggested}</span>
         <p>Suggested interested persons not added</p>
       </div>
-      <div class="contact-stat ${status.missingAddress ? "bad" : ""}">
-        <span>${status.missingAddress}</span>
-        <p>Missing mailing addresses</p>
-      </div>
     </div>
     <div class="guided-toolbar">
       <span class="badge">${people.length} on roster</span>
       <button type="button" class="secondary" data-sync-interested-roster>Sync interested-person treatment</button>
       ${missingSuggestions.length ? `<button type="button" class="secondary" data-roster-add-all-suggested>Add all suggested interested persons</button>` : ""}
     </div>
-    <div class="roster-list">
-      ${people.length ? people.map((person, index) => rosterPersonCardHtml(person, index)).join("") : `
-        <div class="suggestion-empty">No people have been entered yet. Start with the applicant, proposed PR, will, and heirship questions.</div>
-      `}
-    </div>
+    ${rosterCaseSnapshotHtml()}
+    ${groupedRosterHtml(people)}
   `;
   wrapper.querySelector("[data-roster-add-all-suggested]")?.addEventListener("click", () => {
     addAllInterestedPersonSuggestions();
@@ -3558,8 +3944,9 @@ function rosterPersonCardHtml(person, index) {
   const reasonChips = person.reasons.length ? person.reasons : [person.relationship || "Person in case"];
   const added = person.interestedIndex >= 0;
   const canAdd = person.suggestedInterestedPerson && !added;
+  const addressText = cleanText(displayAddressForParty(person));
   return `
-    <div class="roster-card ${person.missingAddress ? "warn" : ""}">
+    <div class="roster-card">
       <div>
         <div class="row-heading">
           <div>
@@ -3568,7 +3955,7 @@ function rosterPersonCardHtml(person, index) {
           </div>
           <span class="badge ${added ? "" : canAdd ? "warn" : ""}">${added ? "Interested person" : canAdd ? "Suggested" : "Roster only"}</span>
         </div>
-        <span>${escapeHtml(person.address || "Address needed")}</span>
+        ${addressText ? `<span>${escapeHtml(addressText)}</span>` : ""}
         <div class="source-chip-list">
           ${sourceChips.map((source) => `<span class="source-chip">${escapeHtml(source)}</span>`).join("")}
         </div>
@@ -3591,13 +3978,15 @@ function addExistingParty(parties, party = {}, options = {}) {
   const key = normalizedPersonName(name);
   if (!key) return;
   const relationship = compactRelationshipText(party.relationship, { maxParts: 4 }) || cleanText(party.relationship);
+  const normalizedParty = applyDeceasedPartyAddressDefault({ ...party, relationship });
   const existing = parties.find((item) => item.key === key);
   if (existing) {
-    existing.address = existing.address || cleanText(party.address);
+    existing.address = existing.address || displayAddressForParty(normalizedParty);
     existing.email = existing.email || cleanText(party.email);
     existing.phone = existing.phone || cleanText(party.phone);
     existing.relationship = compactRelationshipText(relationshipText([existing.relationship, relationship]), { maxParts: 4 });
     existing.minorDateOfBirth = existing.minorDateOfBirth || cleanText(party.minorDateOfBirth);
+    existing.livingStatus = existing.livingStatus || cleanText(party.livingStatus);
     existing.source = relationshipText([existing.source, party.source], " + ");
     existing.roles = { ...(existing.roles || {}), ...(party.roles || {}) };
     return;
@@ -3605,7 +3994,8 @@ function addExistingParty(parties, party = {}, options = {}) {
   parties.push({
     key,
     name,
-    address: cleanText(party.address),
+    address: displayAddressForParty(normalizedParty),
+    livingStatus: cleanText(party.livingStatus),
     email: cleanText(party.email),
     phone: cleanText(party.phone),
     relationship,
@@ -3665,8 +4055,10 @@ function applyExistingParty(target, index, party) {
     item.name = party.name;
     item.address = party.address || item.address || "";
     item.relationship = party.relationship || item.relationship || "";
+    item.livingStatus = party.livingStatus || item.livingStatus || "living";
     item.minorDateOfBirth = party.minorDateOfBirth || item.minorDateOfBirth || "";
     item.role = willBeneficiaryRoleFromParty(party, item.role);
+    applyDeceasedPartyAddressDefault(item);
   }
   if (target === "interestedPerson") {
     const personIndex = Number(index);
@@ -3678,6 +4070,7 @@ function applyExistingParty(target, index, party) {
     person.email = party.email || person.email || "";
     person.phone = party.phone || person.phone || "";
     person.relationship = party.relationship || person.relationship || "Interested person";
+    person.livingStatus = party.livingStatus || person.livingStatus || "";
     person.minorDateOfBirth = party.minorDateOfBirth || person.minorDateOfBirth || "";
     person.roles = { ...person.roles, ...rolesFromSuggestionRelationship(party.relationship), ...(party.roles || {}) };
     if (person.minorDateOfBirth) person.roles.minor = true;
@@ -3702,7 +4095,9 @@ function applyExistingParty(target, index, party) {
     if (!child) return;
     child.name = party.name;
     child.address = party.address || child.address || "";
+    child.livingStatus = party.livingStatus || child.livingStatus || "living";
     child.minorDateOfBirth = party.minorDateOfBirth || child.minorDateOfBirth || "";
+    applyDeceasedPartyAddressDefault(child);
     syncHeirshipChildrenList();
   }
   if (target === "willNamedPr") {
@@ -3750,17 +4145,18 @@ function hasInterestedPersonContent(person = {}) {
     normalized.email,
     normalized.phone,
     normalized.minorDateOfBirth
-  ].some(hasValue) || Object.values(normalized.roles || {}).some(Boolean);
+  ].some(hasValue) || normalized.livingStatus === "deceased" || Object.values(normalized.roles || {}).some(Boolean);
 }
 
 function hasWillBeneficiaryContent(person = {}) {
+  const normalized = normalizeWillBeneficiary(person);
   return [
-    person.name,
-    person.relationship,
-    person.address,
-    person.minorDateOfBirth,
-    person.notes
-  ].some(hasValue);
+    normalized.name,
+    normalized.relationship,
+    normalized.address,
+    normalized.minorDateOfBirth,
+    normalized.notes
+  ].some(hasValue) || normalized.livingStatus === "deceased";
 }
 
 function guidedWillBeneficiariesComplete() {
@@ -3768,7 +4164,10 @@ function guidedWillBeneficiariesComplete() {
   if (state.will.hasNamedBeneficiaries !== "yes") return false;
   const people = state.willBeneficiaries.filter(hasWillBeneficiaryContent);
   if (!people.length) return false;
-  return people.every((person) => hasValue(person.name) && hasValue(person.address));
+  return people.every((person) => {
+    const normalized = normalizeWillBeneficiary(person);
+    return hasValue(normalized.name) && partyHasRequiredMailingAddress(normalized);
+  });
 }
 
 function guidedWillBeneficiariesMessage() {
@@ -3781,14 +4180,20 @@ function guidedWillBeneficiariesMessage() {
       ? "Because this is marked Yes, add each named beneficiary, trust beneficiary, organization, or trustee who should receive notice."
       : "Because this is marked Yes, add each named beneficiary or organization who should receive notice.";
   }
-  const missing = people.filter((person) => !hasValue(person.name) || !hasValue(person.address)).length;
+  const missing = people.filter((person) => {
+    const normalized = normalizeWillBeneficiary(person);
+    return !hasValue(normalized.name) || !partyHasRequiredMailingAddress(normalized);
+  }).length;
   return missing ? `${missing} named person still needs a name or mailing address.` : "";
 }
 
 function guidedInterestedPersonsComplete() {
   const people = state.interestedPersons.filter(hasInterestedPersonContent);
   if (!people.length) return false;
-  return people.every((person) => hasValue(person.name) && hasValue(interestedRelationship(person)) && hasValue(person.address));
+  return people.every((person) => {
+    const normalized = normalizeInterestedPerson(person);
+    return hasValue(normalized.name) && hasValue(interestedRelationship(normalized)) && partyHasRequiredMailingAddress(normalized);
+  });
 }
 
 function guidedInterestedPersonsMessage() {
@@ -3796,7 +4201,10 @@ function guidedInterestedPersonsMessage() {
   if (missingSuggestions) return `${missingSuggestions} suggested interested person${missingSuggestions === 1 ? "" : "s"} not yet added.`;
   const people = state.interestedPersons.filter(hasInterestedPersonContent);
   if (!people.length) return "Add at least one interested person.";
-  const missing = people.filter((person) => !hasValue(person.name) || !hasValue(interestedRelationship(person)) || !hasValue(person.address)).length;
+  const missing = people.filter((person) => {
+    const normalized = normalizeInterestedPerson(person);
+    return !hasValue(normalized.name) || !hasValue(interestedRelationship(normalized)) || !partyHasRequiredMailingAddress(normalized);
+  }).length;
   return missing ? `${missing} interested person${missing === 1 ? "" : "s"} still need a name, role, or mailing address.` : "";
 }
 
@@ -3805,9 +4213,9 @@ function interestedPersonSourceReviewMessage() {
   const suggested = items.filter((item) => item.status === "suggested").length;
   const included = items.filter((item) => item.status === "included").length;
   const missingAddress = items.filter((item) => item.status === "included" && item.service?.missingAddress).length;
-  if (!items.length) return "Enter applicant, will, heirship, or beneficiary answers before auditing interested persons.";
-  if (!included) return "Add at least one interested person before relying on waivers, notice, or service decisions.";
-  if (suggested) return `${suggested} suggested interested person${suggested === 1 ? "" : "s"} still not added.`;
+  if (!items.length) return "Enter applicant, will, heirship, or beneficiary answers before reviewing interested persons.";
+  if (!included) return "Add at least one interested person before continuing.";
+  if (suggested) return `Review the suggested person${suggested === 1 ? "" : "s"} below. Add anyone who should be listed, or click Next if the active list is correct.`;
   if (missingAddress) return `${missingAddress} included interested person${missingAddress === 1 ? "" : "s"} still need mailing-address review.`;
   return "";
 }
@@ -3874,7 +4282,14 @@ function interestedPersonSourceReviewItems() {
 function interestedPersonAuditStatus(person = {}) {
   if (person.interestedIndex >= 0) return { key: "included", label: "Included", tone: "" };
   if (person.suggestedInterestedPerson) return { key: "suggested", label: "Suggested", tone: "warn" };
-  return { key: "excluded", label: "Excluded", tone: "bad" };
+  return { key: "excluded", label: "Not included", tone: "" };
+}
+
+function auditAddressText(address = "", status = "included") {
+  const value = cleanText(address);
+  if (value) return value;
+  if (status === "excluded") return "";
+  return "Address needed";
 }
 
 function interestedPersonAuditDecisionText(person = {}, status = "excluded", service = null) {
@@ -3985,7 +4400,7 @@ function interestedPersonLegalAuditRows(item = {}) {
   if (roles.military) {
     add("military", "Military service", "Military-service status may affect default, notice, or service treatment.", "warn");
   }
-  if (service.missingAddress) {
+  if (service.missingAddress && item.status !== "excluded") {
     add("address", "Mailing address issue", "A complete mailing address is needed before relying on waivers, notices, or service.", "warn");
   }
   if (service.canSignWaiver) {
@@ -4052,10 +4467,6 @@ function renderInterestedPersonsSourceReview() {
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
-    <div class="service-focus-card">
-      <h3>Interested-person legal audit</h3>
-      <p>This software checklist explains why each person/entity is included, suggested, or excluded, and how the current answers affect waiver, notice, service, minor/protected-person, trust, and address treatment.</p>
-    </div>
     <div class="audit-stat-grid">
       <div class="contact-stat">
         <span>${stats.included}</span>
@@ -4065,9 +4476,9 @@ function renderInterestedPersonsSourceReview() {
         <span>${stats.suggested}</span>
         <p>Suggested, not added</p>
       </div>
-      <div class="contact-stat ${stats.excluded ? "bad" : ""}">
+      <div class="contact-stat">
         <span>${stats.excluded}</span>
-        <p>Excluded / roster only</p>
+        <p>Not included</p>
       </div>
       <div class="contact-stat ${stats.attention ? "warn" : ""}">
         <span>${stats.attention}</span>
@@ -4084,8 +4495,7 @@ function renderInterestedPersonsSourceReview() {
     </div>
     <div class="guided-toolbar">
       <span class="badge">${items.length} audited</span>
-      ${stats.suggested ? `<button type="button" class="secondary" data-add-all-source-suggestions>Add all suggested people</button>` : ""}
-      <button type="button" class="secondary" data-sync-source-audit>Sync audit from answers</button>
+      ${stats.suggested ? `<button type="button" class="secondary" data-add-all-source-suggestions>Add all suggested people to the list</button>` : ""}
     </div>
     <div class="guided-note">
       <p>Removing someone here only removes that person from the active interested-person list. It will not change applicant, will, heirship, or beneficiary answers; if those answers still point to the same person, the app may suggest adding that person again.</p>
@@ -4098,16 +4508,13 @@ function renderInterestedPersonsSourceReview() {
   `;
   wrapper.querySelector("[data-add-all-source-suggestions]")?.addEventListener("click", () => {
     addAllInterestedPersonSuggestions();
-    renderInterview();
-  });
-  wrapper.querySelector("[data-sync-source-audit]")?.addEventListener("click", () => {
-    syncInterestedRosterAndRefresh(false);
+    goToInterviewStep("interested-details");
   });
   wrapper.querySelectorAll("[data-add-source-suggestion]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = items[Number(button.dataset.addSourceSuggestion)];
       addInterestedPersonSuggestion(item?.suggestion || item);
-      renderInterview();
+      goToInterviewStep("interested-details");
     });
   });
   wrapper.querySelectorAll("[data-remove-source-current]").forEach((button) => {
@@ -4130,6 +4537,7 @@ function sourceReviewCardHtml(item, auditIndex) {
   const reasonChips = item.reasons.length ? item.reasons : ["No source reason available"];
   const sourceChips = item.sources?.length ? item.sources : splitSourceParts(item.source || "");
   const auditRows = interestedPersonLegalAuditRows(item);
+  const addressText = auditAddressText(item.address, item.status);
   const open = item.status === "suggested" || item.service?.needsAttention;
   return `
     <details class="source-review-card ${escapeAttr(item.status)} ${escapeAttr(item.tone || "")}" ${open ? "open" : ""}>
@@ -4137,7 +4545,7 @@ function sourceReviewCardHtml(item, auditIndex) {
         <div>
           <h3>${escapeHtml(item.name)}</h3>
           <p>${escapeHtml(item.relationship || "Interested person")}</p>
-          <span>${escapeHtml(item.address || "Address needed")}</span>
+          ${addressText ? `<span>${escapeHtml(addressText)}</span>` : ""}
         </div>
         <div class="suggestion-actions">
           <span class="badge ${escapeAttr(item.tone || "")}">${escapeHtml(item.statusLabel)}</span>
@@ -4168,7 +4576,7 @@ function sourceReviewCardHtml(item, auditIndex) {
         <div class="audit-card-actions">
           ${item.current
             ? `<button type="button" class="ghost" data-remove-source-current="${Number(item.interestedIndex)}">Remove from list</button>`
-            : `<button type="button" class="secondary" data-add-source-suggestion="${Number(auditIndex)}">Add anyway</button>`}
+            : `<button type="button" class="secondary" data-add-source-suggestion="${Number(auditIndex)}">Add this person to the list</button>`}
         </div>
       </div>
     </details>
@@ -4200,6 +4608,7 @@ function defaultPreparerToApplicant() {
   state.preparer.email = state.applicant.email;
   state.preparer.phone = state.applicant.phone;
   state.preparer.barNumber = state.applicant.barNumber;
+  state.ui.preparerSource = "applicant";
   saveState();
 }
 
@@ -4225,10 +4634,33 @@ function guidedPersonMatch(saved = {}, source = {}, options = {}) {
   return true;
 }
 
+function selectedPreparerSource() {
+  const applicantMatch = guidedPersonMatch(state.preparer, state.applicant);
+  const prMatch = guidedPersonMatch(state.preparer, state.pr);
+  if (state.ui.preparerSource === "applicant" && applicantMatch) return "applicant";
+  if (state.ui.preparerSource === "pr" && prMatch) return "pr";
+  if (applicantMatch && !prMatch) return "applicant";
+  if (prMatch && !applicantMatch) return "pr";
+  if (applicantMatch && prMatch) return "applicant";
+  return "";
+}
+
+function selectedHeirshipInformantSource(applicantRelationship = state.applicant.capacity || "Applicant") {
+  const applicantMatch = guidedPersonMatch(state.heirship.informant, state.applicant, { relationship: [applicantRelationship, "Applicant"] });
+  const prMatch = guidedPersonMatch(state.heirship.informant, state.pr, { relationship: "Proposed Personal Representative" });
+  if (state.ui.heirshipInformantSource === "applicant" && applicantMatch) return "applicant";
+  if (state.ui.heirshipInformantSource === "pr" && prMatch) return "pr";
+  if (applicantMatch && !prMatch) return "applicant";
+  if (prMatch && !applicantMatch) return "pr";
+  if (applicantMatch && prMatch) return "applicant";
+  return "";
+}
+
 function renderGuidedPreparer() {
   defaultPreparerToApplicant();
-  const applicantSelected = guidedPersonMatch(state.preparer, state.applicant);
-  const prSelected = guidedPersonMatch(state.preparer, state.pr);
+  const selectedSource = selectedPreparerSource();
+  const applicantSelected = selectedSource === "applicant";
+  const prSelected = selectedSource === "pr";
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
@@ -4238,11 +4670,11 @@ function renderGuidedPreparer() {
       <div class="choice-grid role-choice-grid">
         <button type="button" class="choice-button ${applicantSelected ? "selected" : ""}" aria-pressed="${applicantSelected ? "true" : "false"}" data-use-applicant-preparer>
           <strong>Use applicant</strong>
-          <span>${escapeHtml(state.applicant.fullName || "Applicant details will be copied here.")}</span>
+          <span>Copy applicant details into the fields below.</span>
         </button>
         <button type="button" class="choice-button ${prSelected ? "selected" : ""}" aria-pressed="${prSelected ? "true" : "false"}" data-use-pr-preparer ${hasValue(state.pr.fullName) ? "" : "disabled"}>
           <strong>Use proposed PR</strong>
-          <span>${escapeHtml(state.pr.fullName || "Enter the proposed PR first.")}</span>
+          <span>${hasValue(state.pr.fullName) ? "Copy proposed PR details into the fields below." : "Enter the proposed PR first."}</span>
         </button>
       </div>
     </div>
@@ -4287,6 +4719,7 @@ function copyApplicantToHeirshipInformant() {
   state.heirship.informant.name = state.applicant.fullName;
   state.heirship.informant.address = state.applicant.address;
   state.heirship.informant.relationship = state.applicant.capacity || "Applicant";
+  state.ui.heirshipInformantSource = "applicant";
   saveState();
   renderFields();
   renderReview();
@@ -4297,6 +4730,7 @@ function copyPrToHeirshipInformant() {
   state.heirship.informant.name = state.pr.fullName;
   state.heirship.informant.address = state.pr.address;
   state.heirship.informant.relationship = "Proposed Personal Representative";
+  state.ui.heirshipInformantSource = "pr";
   saveState();
   renderFields();
   renderReview();
@@ -4308,6 +4742,7 @@ function defaultHeirshipInformantToApplicant() {
   state.heirship.informant.name = state.applicant.fullName;
   state.heirship.informant.address = state.applicant.address;
   state.heirship.informant.relationship = state.applicant.capacity || "Applicant";
+  state.ui.heirshipInformantSource = "applicant";
   saveState();
 }
 
@@ -4327,22 +4762,23 @@ function guidedHeirshipInformantMessage() {
 function renderGuidedHeirshipInformant() {
   defaultHeirshipInformantToApplicant();
   const applicantRelationship = state.applicant.capacity || "Applicant";
-  const applicantSelected = guidedPersonMatch(state.heirship.informant, state.applicant, { relationship: [applicantRelationship, "Applicant"] });
-  const prSelected = guidedPersonMatch(state.heirship.informant, state.pr, { relationship: "Proposed Personal Representative" });
+  const selectedSource = selectedHeirshipInformantSource(applicantRelationship);
+  const applicantSelected = selectedSource === "applicant";
+  const prSelected = selectedSource === "pr";
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
     <div class="guided-person-card">
-      <h3>Who can answer the family-tree questions?</h3>
-      <p>This person signs PR-1806 Proof of Heirship. It is usually the applicant or proposed personal representative if they know the family facts.</p>
+      <h3>Who will sign PR-1806 Proof of Heirship?</h3>
+      <p>Choose the applicant or proposed personal representative if that person knows the family-tree facts. Otherwise, enter the person who will answer and sign the Proof of Heirship.</p>
       <div class="choice-grid role-choice-grid">
         <button type="button" class="choice-button ${applicantSelected ? "selected" : ""}" aria-pressed="${applicantSelected ? "true" : "false"}" data-use-applicant-informant>
           <strong>Use applicant</strong>
-          <span>${escapeHtml(state.applicant.fullName || "Applicant details will be copied here.")}</span>
+          <span>Copy applicant details into the fields below.</span>
         </button>
         <button type="button" class="choice-button ${prSelected ? "selected" : ""}" aria-pressed="${prSelected ? "true" : "false"}" data-use-pr-informant ${hasValue(state.pr.fullName) ? "" : "disabled"}>
           <strong>Use proposed PR</strong>
-          <span>${escapeHtml(state.pr.fullName || "Enter the proposed PR first.")}</span>
+          <span>${hasValue(state.pr.fullName) ? "Copy proposed PR details into the fields below." : "Enter the proposed PR first."}</span>
         </button>
       </div>
     </div>
@@ -4521,6 +4957,7 @@ function willRoleCardHtml(config) {
 
 function renderGuidedWillBeneficiaries() {
   if (state.will.hasNamedBeneficiaries === "yes" && !state.willBeneficiaries.length) state.willBeneficiaries.push(emptyWillBeneficiary());
+  state.willBeneficiaries = state.willBeneficiaries.map(normalizeWillBeneficiary);
   const addBeneficiary = () => {
     state.will.hasNamedBeneficiaries = "yes";
     state.willBeneficiaries.push(emptyWillBeneficiary());
@@ -4553,8 +4990,9 @@ function renderGuidedWillBeneficiaries() {
     </div>
     <div class="guided-card-list">
       ${state.willBeneficiaries.map((person, index) => {
-        const displayName = cleanText(person.name) || `Named person ${index + 1}`;
-        const roleLabel = beneficiaryRoleLabel(person.role);
+        const normalized = normalizeWillBeneficiary(person);
+        const displayName = cleanText(normalized.name) || `Named person ${index + 1}`;
+        const roleLabel = beneficiaryRoleLabel(normalized.role);
         return `
         <div class="guided-person-card repeated-card named-person-card">
           <div class="repeat-card-header">
@@ -4569,24 +5007,29 @@ function renderGuidedWillBeneficiaries() {
             ${partyPickerHtml("willBeneficiary", index)}
             <div class="grid two compact">
               <label>Name
-                <input data-guided-path="willBeneficiaries.${index}.name" value="${escapeAttr(person.name)}" />
+                <input data-guided-path="willBeneficiaries.${index}.name" value="${escapeAttr(normalized.name)}" />
               </label>
               <label>Role
                 <select data-guided-path="willBeneficiaries.${index}.role">
-                  ${beneficiaryRoleOptionsHtml(person.role)}
+                  ${beneficiaryRoleOptionsHtml(normalized.role)}
                 </select>
               </label>
               <label>Relationship or description
-                <input data-guided-path="willBeneficiaries.${index}.relationship" value="${escapeAttr(person.relationship)}" placeholder="Child, friend, charity, trust" />
+                <input data-guided-path="willBeneficiaries.${index}.relationship" value="${escapeAttr(normalized.relationship)}" placeholder="Child, friend, charity, trust" />
+              </label>
+              <label>Living status
+                <select data-guided-path="willBeneficiaries.${index}.livingStatus">
+                  ${livingStatusOptionsHtml(normalized.livingStatus || "living", false)}
+                </select>
               </label>
               <label>Mailing address
-                <input data-guided-path="willBeneficiaries.${index}.address" value="${escapeAttr(person.address)}" />
+                <input data-guided-path="willBeneficiaries.${index}.address" value="${escapeAttr(displayAddressForParty(normalized))}" />
               </label>
-              <label>Minor date of birth
-                <input type="date" data-guided-path="willBeneficiaries.${index}.minorDateOfBirth" value="${escapeAttr(person.minorDateOfBirth)}" />
+              <label>Date of birth, if minor
+                <input type="date" data-guided-path="willBeneficiaries.${index}.minorDateOfBirth" value="${escapeAttr(normalized.minorDateOfBirth)}" />
               </label>
               <label>Notes
-                <input data-guided-path="willBeneficiaries.${index}.notes" value="${escapeAttr(person.notes)}" />
+                <input data-guided-path="willBeneficiaries.${index}.notes" value="${escapeAttr(normalized.notes)}" />
               </label>
             </div>
           </div>
@@ -4753,15 +5196,22 @@ function addBlankGuidedInterestedPerson() {
 
 function renderGuidedInterestedSuggestions() {
   if (!state.interestedPersons.length) state.interestedPersons.push(emptyInterestedPerson());
-  syncInterestedPersonRoster({ addMissing: false });
-  const suggestions = interestedPersonSuggestions();
+  let suggestions = interestedPersonSuggestions();
+  if (!state.ui.interestedSuggestionsAutoAdded && suggestions.length) {
+    syncInterestedPersonRoster({ addMissing: true });
+    state.ui.interestedSuggestionsAutoAdded = true;
+    saveState();
+  } else {
+    syncInterestedPersonRoster({ addMissing: false });
+  }
+  suggestions = interestedPersonSuggestions();
   const missingSuggestions = suggestions.filter((suggestion) => existingInterestedPersonIndex(suggestion.name) < 0);
   const wrapper = document.createElement("div");
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
     <div class="service-focus-card">
-      <h3>Select interested persons for this probate.</h3>
-      <p>Add each suggested person who should receive notice or sign a waiver. You can also add someone manually if the app did not suggest them.</p>
+      <h3>Review the interested persons for this probate.</h3>
+      <p>The app added likely interested persons from your answers. Remove anyone who should not be listed, or add someone manually if the app missed them.</p>
     </div>
     <div class="contact-status-grid">
       <div class="contact-stat">
@@ -4780,7 +5230,7 @@ function renderGuidedInterestedSuggestions() {
     <div class="guided-toolbar">
       <span class="badge">${suggestions.length} found</span>
       <button type="button" class="secondary" data-sync-guided-interested>Refresh suggestions</button>
-      <button type="button" class="secondary prominent-add" data-add-all-guided-suggestions ${missingSuggestions.length ? "" : "disabled"}>Add all suggested interested persons</button>
+      <button type="button" class="secondary prominent-add" data-add-all-guided-suggestions ${missingSuggestions.length ? "" : "disabled"}>Add remaining suggested interested persons</button>
       <button type="button" class="secondary prominent-add" data-add-guided-person>Add another interested person</button>
     </div>
     <div class="guided-suggestions">
@@ -4788,7 +5238,7 @@ function renderGuidedInterestedSuggestions() {
         const existingIndex = existingInterestedPersonIndex(suggestion.name);
         return `
           <div class="suggestion-card">
-            <div>
+            <div class="suggestion-main">
               <h3>${escapeHtml(suggestion.name)}</h3>
               <p>${escapeHtml(suggestion.relationship || "Interested person")}</p>
               <span>${escapeHtml(suggestion.address || "Address needed")}</span>
@@ -4877,9 +5327,12 @@ function renderGuidedInterestedService() {
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
     <div class="service-focus-card">
-      <h3>Choose waiver or notice treatment for each person.</h3>
-      <p>PR-1803 is the waiver and consent form. Mark "will sign waiver" only when the person is an adult, located, and expected to sign. Anything else may require mailed notice or PR-1805 review.</p>
+      <h3>Who can sign the waiver, and who needs notice?</h3>
     </div>
+    <details class="compact-help service-summary-details">
+      <summary>What does a PR-1803 waiver mean?</summary>
+      <p>A PR-1803 waiver means the interested person signs a consent form instead of receiving a formal hearing notice. Use "will sign waiver" only when the person is an adult, located, and expected to sign. Anything else may require mailed notice or PR-1805 review.</p>
+    </details>
     <details class="compact-help service-summary-details">
       <summary>Who usually counts as an interested person?</summary>
       <p>Common examples include heirs, people named in a will or codicil, a nominated personal representative, trustees or trust beneficiaries connected to the estate plan, and anyone who needs a guardian, agent, or special notice review. Close calls should be reviewed before filing.</p>
@@ -4907,10 +5360,14 @@ function renderGuidedInterestedService() {
           <strong>${summary.unansweredWaiverCount}</strong>
           <span>waiver answers missing</span>
         </div>
+        <div class="packet-stat">
+          <strong>${summary.unansweredLocationCount}</strong>
+          <span>address answers missing</span>
+        </div>
       </div>
     </details>
     <div class="guided-toolbar">
-      <span class="badge">${summary.unansweredWaiverCount} unanswered</span>
+      <span class="badge">${summary.unansweredWaiverCount + summary.unansweredLocationCount} unanswered</span>
       <button type="button" class="secondary" data-sync-service-treatment>Sync service treatment</button>
       <button type="button" class="secondary" data-mark-eligible-waivers ${summary.total ? "" : "disabled"}>Mark eligible known adults as willing to sign</button>
     </div>
@@ -4934,8 +5391,8 @@ function markEligibleKnownAdultsCanSign() {
     if (!hasInterestedPersonContent(normalized)) return normalized;
     const status = interestedPersonServiceStatus(normalized);
     const waiverStatus = normalized.service?.waiverStatus || "";
-    const hardStop = ["cannot_sign", "will_not_sign", "not_eligible"].includes(waiverStatus) || status.protectedPerson || status.unknownOrMissing;
-    if (hardStop || !hasValue(normalized.address)) return normalized;
+    const hardStop = partyMarkedDeceased(normalized) || ["cannot_sign", "will_not_sign", "not_eligible"].includes(waiverStatus) || status.protectedPerson || status.unknownOrMissing;
+    if (hardStop || !partyHasRequiredMailingAddress(normalized)) return normalized;
     if (!hasValue(waiverStatus) || waiverStatus === "unknown" || waiverStatus === "can_sign") {
       normalized.service.waiverStatus = "can_sign";
       normalized.service.locationStatus = "known";
@@ -4956,13 +5413,14 @@ function markEligibleKnownAdultsCanSign() {
 
 function guidedInterestedServiceComplete() {
   const summary = interestedPersonServiceSummary();
-  return summary.total > 0 && summary.unansweredWaiverCount === 0;
+  return summary.total > 0 && summary.unansweredWaiverCount === 0 && summary.unansweredLocationCount === 0;
 }
 
 function guidedInterestedServiceMessage() {
   const summary = interestedPersonServiceSummary();
   if (!summary.total) return "Add interested persons before answering waiver and service questions.";
   if (summary.unansweredWaiverCount) return `${summary.unansweredWaiverCount} interested person${summary.unansweredWaiverCount === 1 ? "" : "s"} still need a waiver-status answer.`;
+  if (summary.unansweredLocationCount) return `${summary.unansweredLocationCount} interested person${summary.unansweredLocationCount === 1 ? "" : "s"} still need an address/location answer.`;
   if (summary.missingAddressCount) return `${summary.missingAddressCount} interested person${summary.missingAddressCount === 1 ? "" : "s"} still need address/location review.`;
   return "";
 }
@@ -4993,7 +5451,7 @@ function renderGuidedInterestedPersons() {
         const existingIndex = existingInterestedPersonIndex(suggestion.name);
         return `
           <div class="suggestion-card">
-            <div>
+            <div class="suggestion-main">
               <h3>${escapeHtml(suggestion.name)}</h3>
               <p>${escapeHtml(suggestion.relationship || "Interested person")}</p>
               <span>${escapeHtml(suggestion.address || "Address needed")}</span>
@@ -5061,10 +5519,15 @@ function guidedInterestedPersonCardHtml(person, index) {
         <label>Relationship or role
           <input data-guided-path="interestedPersons.${index}.relationship" value="${escapeAttr(person.relationship)}" placeholder="Heir, beneficiary, fiduciary" />
         </label>
-        <label>Mailing address
-          <input data-guided-path="interestedPersons.${index}.address" value="${escapeAttr(person.address)}" />
+        <label>Living status
+          <select data-guided-path="interestedPersons.${index}.livingStatus">
+            ${livingStatusOptionsHtml(person.livingStatus)}
+          </select>
         </label>
-        <label>Minor date of birth
+        <label>Mailing address
+          <input data-guided-path="interestedPersons.${index}.address" value="${escapeAttr(displayAddressForParty(person))}" />
+        </label>
+        <label>Date of birth, if minor
           <input type="date" data-guided-path="interestedPersons.${index}.minorDateOfBirth" value="${escapeAttr(person.minorDateOfBirth)}" />
         </label>
         <label>Email
@@ -5090,14 +5553,14 @@ function guidedInterestedPersonCardHtml(person, index) {
           ${serviceStatusBadgesHtml(person)}
         </div>
         <div class="grid two compact">
-          <label>Waiver status
+          <label>Waiver status <span class="required-marker">* required</span>
             <select data-guided-path="interestedPersons.${index}.service.waiverStatus">
               ${waiverStatusOptionsHtml(person.service?.waiverStatus || "")}
             </select>
           </label>
-          <label>Address/location status
+          <label>Address/location status <span class="required-marker">* required</span>
             <select data-guided-path="interestedPersons.${index}.service.locationStatus">
-              ${locationStatusOptionsHtml(person.service?.locationStatus || "known")}
+              ${locationStatusOptionsHtml(person.service?.locationStatus || "")}
             </select>
           </label>
         </div>
@@ -5118,6 +5581,7 @@ function guidedInterestedPersonCardHtml(person, index) {
 
 function guidedInterestedPersonDetailsCardHtml(person, index, displayIndex = index) {
   const displayName = cleanText(person.name) || `Interested person ${displayIndex + 1}`;
+  const showExistingPersonPicker = index === activeInterestedDraftIndex();
   return `
     <div class="guided-person-card repeated-card">
       <div class="repeat-card-header">
@@ -5129,7 +5593,7 @@ function guidedInterestedPersonDetailsCardHtml(person, index, displayIndex = ind
         <button type="button" class="ghost" data-remove-guided-person="${index}">Remove</button>
       </div>
       <div class="repeat-card-body">
-        ${partyPickerHtml("interestedPerson", index)}
+        ${showExistingPersonPicker ? partyPickerHtml("interestedPerson", index) : ""}
         <div class="grid two compact">
           <label>Name
             <input data-guided-path="interestedPersons.${index}.name" value="${escapeAttr(person.name)}" />
@@ -5137,10 +5601,15 @@ function guidedInterestedPersonDetailsCardHtml(person, index, displayIndex = ind
           <label>Relationship or role
             <input data-guided-path="interestedPersons.${index}.relationship" value="${escapeAttr(person.relationship)}" placeholder="Heir, beneficiary, fiduciary" />
           </label>
-          <label>Mailing address
-            <input data-guided-path="interestedPersons.${index}.address" value="${escapeAttr(person.address)}" />
+          <label>Living status
+            <select data-guided-path="interestedPersons.${index}.livingStatus">
+              ${livingStatusOptionsHtml(person.livingStatus)}
+            </select>
           </label>
-          <label>Minor date of birth
+          <label>Mailing address
+            <input data-guided-path="interestedPersons.${index}.address" value="${escapeAttr(displayAddressForParty(person))}" />
+          </label>
+          <label>Date of birth, if minor
             <input type="date" data-guided-path="interestedPersons.${index}.minorDateOfBirth" value="${escapeAttr(person.minorDateOfBirth)}" />
           </label>
           <label>Email
@@ -5174,19 +5643,19 @@ function guidedInterestedServiceCardHtml(person, index) {
         <div>
           <h3>${escapeHtml(displayName)}</h3>
           <p>${escapeHtml(interestedRelationship(person) || "Interested person")}</p>
-          <p>${escapeHtml(person.address || "Address needed")}</p>
+          <p>${escapeHtml(displayAddressForParty(person) || "Address needed")}</p>
         </div>
         ${serviceStatusBadgesHtml(person)}
       </div>
       <div class="grid two compact">
-        <label>Waiver status
+        <label>Waiver status <span class="required-marker">* required</span>
           <select class="decision-select" data-guided-path="interestedPersons.${index}.service.waiverStatus">
             ${waiverStatusOptionsHtml(person.service?.waiverStatus || "")}
           </select>
         </label>
-        <label>Address/location status
+        <label>Address/location status <span class="required-marker">* required</span>
           <select class="decision-select" data-guided-path="interestedPersons.${index}.service.locationStatus">
-            ${locationStatusOptionsHtml(person.service?.locationStatus || "known")}
+            ${locationStatusOptionsHtml(person.service?.locationStatus || "")}
           </select>
         </label>
       </div>
@@ -5257,14 +5726,21 @@ function bindGuidedPathInputs(root) {
   root.querySelectorAll("[data-guided-path]").forEach((input) => {
     const update = (rerender = false) => {
       const path = input.dataset.guidedPath;
+      const previousEstateCounty = path === "estate.county" ? state.estate.county : "";
       const value = input.type === "checkbox" ? input.checked : input.value;
       setPath(path, value);
+      applyLivingStatusAddressDefault(path);
+      saveState();
       if ((path === "pr.sameAsApplicant" || path.startsWith("applicant.")) && state.pr.sameAsApplicant) {
         syncApplicantToPr();
+      }
+      if (path === "pr.sameAsApplicant" || path.startsWith("applicant.") || path.startsWith("pr.")) {
+        syncPreparerFromSelectedSource();
       }
       if (path.startsWith("countyDefaults.")) {
         applyCountyDefaults({ force: true });
       } else if (path === "estate.county") {
+        syncDomicileCountyFromEstateCounty(state, { previousEstateCounty, persist: false });
         syncCountyDefaultsFromCounty();
       }
       if (path === "pathRouter.grossValue") {
@@ -5275,10 +5751,18 @@ function bindGuidedPathInputs(root) {
         state.pathRouter.grossValue = value;
         state.estate.estimatedNetValue = value;
       }
+      if (path.startsWith("preparer.")) {
+        state.ui.preparerSource = "manual";
+      }
+      if (path.startsWith("heirship.informant.")) {
+        state.ui.heirshipInformantSource = "manual";
+      }
       if (path.startsWith("interestedPersons.")) {
         renderInterestedPersons();
-        if (path.includes(".service.")) {
+        if (path.endsWith(".livingStatus") || path.includes(".service.")) {
+          renderReview();
           renderInterview();
+          return;
         }
       }
       if (path.startsWith("benefits.")) {
@@ -5292,6 +5776,11 @@ function bindGuidedPathInputs(root) {
       if (path.startsWith("willBeneficiaries.")) {
         renderWillBeneficiaries();
         renderInterestedSuggestions();
+        if (path.endsWith(".livingStatus")) {
+          renderReview();
+          renderInterview();
+          return;
+        }
       }
       if (path.startsWith("heirship.children.")) {
         syncHeirshipChildrenList();
@@ -5391,28 +5880,34 @@ function addressContactItems() {
   });
   if (state.will.exists === "yes" && state.will.hasNamedBeneficiaries === "yes") {
     state.willBeneficiaries.forEach((person, index) => {
-      if (!hasWillBeneficiaryContent(person)) return;
+      const normalized = normalizeWillBeneficiary(person);
+      state.willBeneficiaries[index] = normalized;
+      if (!hasWillBeneficiaryContent(normalized)) return;
       addAddressContactItem(items, {
         key: `will-beneficiary-${index}`,
-        title: beneficiaryRoleLabel(person.role),
-        name: person.name || `Named person ${index + 1}`,
-        detail: person.relationship,
+        title: beneficiaryRoleLabel(normalized.role),
+        name: normalized.name || `Named person ${index + 1}`,
+        detail: relationshipText([normalized.relationship, partyMarkedDeceased(normalized) ? "Deceased" : ""]),
         addressPath: `willBeneficiaries.${index}.address`,
-        requiredAddress: true
+        requiredAddress: !partyMarkedDeceased(normalized),
+        defaultAddress: displayAddressForParty(normalized)
       });
     });
   }
   state.interestedPersons.forEach((person, index) => {
-    if (!hasInterestedPersonContent(person)) return;
+    const normalized = normalizeInterestedPerson(person);
+    state.interestedPersons[index] = normalized;
+    if (!hasInterestedPersonContent(normalized)) return;
     addAddressContactItem(items, {
       key: `interested-${index}`,
       title: "Interested Person",
-      name: person.name || `Interested person ${index + 1}`,
-      detail: interestedRelationship(person),
+      name: normalized.name || `Interested person ${index + 1}`,
+      detail: relationshipText([interestedRelationship(normalized), partyMarkedDeceased(normalized) ? "Deceased" : ""]),
       addressPath: `interestedPersons.${index}.address`,
       emailPath: `interestedPersons.${index}.email`,
       phonePath: `interestedPersons.${index}.phone`,
-      requiredAddress: true,
+      requiredAddress: !partyMarkedDeceased(normalized),
+      defaultAddress: displayAddressForParty(normalized),
       contactRecommended: true
     });
   });
@@ -5420,7 +5915,7 @@ function addressContactItems() {
 }
 
 function addAddressContactItem(items, item) {
-  const address = item.addressPath ? getPath(item.addressPath) : "";
+  const address = hasValue(item.defaultAddress) ? item.defaultAddress : item.addressPath ? getPath(item.addressPath) : "";
   const email = item.emailPath ? getPath(item.emailPath) : "";
   const phone = item.phonePath ? getPath(item.phonePath) : "";
   items.push({
@@ -5581,16 +6076,23 @@ function countyLibraryDefault(countyName) {
 }
 
 function countyDefaultsStatus() {
-  const requiredMissing = [
-    state.countyDefaults.courthouseCounty || state.estate.county,
-    state.countyDefaults.courthouseAddress
-  ].filter((value) => !hasValue(value)).length;
-  const helpfulMissing = [
-    state.countyDefaults.probateOfficeName,
-    state.countyDefaults.registrarName,
-    state.countyDefaults.newspaperName
-  ].filter((value) => !hasValue(value)).length;
-  return { requiredMissing, helpfulMissing };
+  const required = [
+    { path: "countyDefaults.courthouseCounty", value: state.countyDefaults.courthouseCounty || state.estate.county },
+    { path: "countyDefaults.courthouseAddress", value: state.countyDefaults.courthouseAddress }
+  ];
+  const helpful = [
+    { path: "countyDefaults.probateOfficeName", value: state.countyDefaults.probateOfficeName },
+    { path: "countyDefaults.registrarName", value: state.countyDefaults.registrarName },
+    { path: "countyDefaults.newspaperName", value: state.countyDefaults.newspaperName }
+  ];
+  const requiredMissingPaths = required.filter((item) => !hasValue(item.value)).map((item) => item.path);
+  const helpfulMissingPaths = helpful.filter((item) => !hasValue(item.value)).map((item) => item.path);
+  return {
+    requiredMissing: requiredMissingPaths.length,
+    helpfulMissing: helpfulMissingPaths.length,
+    requiredMissingPaths,
+    helpfulMissingPaths
+  };
 }
 
 function countyDefaultsMessage() {
@@ -5640,6 +6142,13 @@ function loadCountyLibraryDefault(options = {}) {
   return true;
 }
 
+function countySetupJumpTarget(kind = "required") {
+  const status = countyDefaultsStatus();
+  const paths = kind === "helpful" ? status.helpfulMissingPaths : status.requiredMissingPaths;
+  const path = paths[0] || status.requiredMissingPaths[0] || status.helpfulMissingPaths[0] || "countyDefaults.courthouseAddress";
+  return { step: "county-court-setup", selector: `[data-guided-path="${path}"]` };
+}
+
 function renderCountyCourtSetup() {
   syncCountyDefaultsFromCounty();
   const status = countyDefaultsStatus();
@@ -5652,28 +6161,28 @@ function renderCountyCourtSetup() {
   wrapper.className = "guided-repeat";
   wrapper.innerHTML = `
     <div class="contact-status-grid">
-      <div class="contact-stat ${status.requiredMissing ? "bad" : ""}">
+      <button type="button" class="contact-stat county-stat-button ${status.requiredMissing ? "bad" : ""}" data-county-missing="required">
         <span>${status.requiredMissing}</span>
         <p>Required court defaults missing</p>
-      </div>
-      <div class="contact-stat ${status.helpfulMissing ? "warn" : ""}">
+      </button>
+      <button type="button" class="contact-stat county-stat-button ${status.helpfulMissing ? "warn" : ""}" data-county-missing="helpful">
         <span>${status.helpfulMissing}</span>
         <p>Helpful local details missing</p>
-      </div>
+      </button>
     </div>
     <div class="guided-person-card">
       <div class="row-heading">
         <div>
           <h3>${escapeHtml(state.estate.county || "County")} filing defaults</h3>
           <details class="compact-help">
-            <summary>County default details</summary>
-            <p>These values can fill creditor notice and PR-1805 notice fields when they are blank.</p>
+            <summary>What these details do</summary>
+            <p>Use the county library to fill known local details, then edit anything that looks wrong. The copy button places these values into the PR-1804 and PR-1805 notice fields.</p>
             <p>${escapeHtml(defaultStatus)}</p>
           </details>
         </div>
         <div class="inline-actions">
-          <button type="button" class="secondary" data-load-county-library ${libraryDefault ? "" : "disabled"}>Use library defaults</button>
-          <button type="button" class="secondary" data-apply-county-defaults>Apply to notice forms</button>
+          <button type="button" class="secondary" data-load-county-library ${libraryDefault ? "" : "disabled"}>Use saved county defaults</button>
+          <button type="button" class="secondary" data-apply-county-defaults>Copy these details into notice forms</button>
         </div>
       </div>
       <div class="grid two compact">
@@ -5692,7 +6201,7 @@ function renderCountyCourtSetup() {
         <label>Probate registrar, if known
           <input data-guided-path="countyDefaults.registrarName" value="${escapeAttr(state.countyDefaults.registrarName)}" />
         </label>
-        <label>Publication newspaper
+        <label>Publication newspaper, if known
           <input data-guided-path="countyDefaults.newspaperName" value="${escapeAttr(state.countyDefaults.newspaperName)}" />
         </label>
         <label>Accommodation phone, if known
@@ -5705,6 +6214,9 @@ function renderCountyCourtSetup() {
     </div>
   `;
   bindGuidedPathInputs(wrapper);
+  wrapper.querySelectorAll("[data-county-missing]").forEach((button) => {
+    button.addEventListener("click", () => jumpToIssueTarget(countySetupJumpTarget(button.dataset.countyMissing)));
+  });
   wrapper.querySelector("[data-load-county-library]")?.addEventListener("click", () => {
     loadCountyLibraryDefault({ force: true });
     applyCountyDefaults({ force: true });
@@ -5951,7 +6463,7 @@ function sortedPacketRows(rows) {
 function packetFormRowsHtml(rows) {
   return sortedPacketRows(rows).map((item) => `
     <div class="packet-form-row ${escapeAttr(item.status)}">
-      <div>
+      <div class="suggestion-main">
         <h4>${escapeHtml(packetFormLabel(item))}</h4>
         <p>${escapeHtml(item.reason)}</p>
       </div>
@@ -6350,10 +6862,10 @@ function productInfo(key = "informal_probate") {
     },
     information_summary: {
       key: "information_summary",
-      title: "Information Summary",
-      price: "Free",
-      free: "Download your information summary and choose whether to contact a Wisconsin probate attorney.",
-      paid: "No attorney referral or data sharing is included."
+      title: "Attorney-Ready Case Summary",
+      price: "Free beta",
+      free: "Keep answering questions for free. If review is needed, download a clean case summary and choose whether to share it.",
+      paid: "No attorney referral, lead sale, or data sharing is included without a later consent-based model."
     },
     attorney_handoff: {
       key: "attorney_handoff",
@@ -6873,11 +7385,22 @@ function productionLaunchHandoffText(data = state) {
       "- After payment/unlock, provide a secure download page or expiring authenticated link.",
       "- Do not email final probate documents as ordinary attachments unless a lawyer-approved delivery policy allows it.",
       "",
+      "Attorney-ready case summary and referrals",
+      "- Keep collecting useful intake facts even when the final route may require attorney review.",
+      "- Do not sell, send, or expose a user's probate information to an attorney without clear user consent.",
+      "- Treat any attorney directory, sponsorship, subscription, or referral-fee model as a separate Wisconsin ethics/compliance review item before launch.",
+      "- The safest prototype path is a user-controlled export package the user may choose to share.",
+      "",
       "Document output",
       "- Public users usually print, wet-sign, and paper file or mail the opening packet.",
       "- Attorney eFiling format rule: PR-1801, PR-1804, PR-1805, and PR-1808 are Word/DOCX; the other opening and later PR forms are PDFs.",
       "- Signed forms still need wet signatures before paper filing or scanned/flattened PDF handling when they are in the PDF lane.",
       "- Later administration forms such as PR-1811 should live in a later-stage folder after letters issue.",
+      "",
+      "Post-letters EIN and banking opportunity",
+      `- After domiciliary letters issue, add an administration step that links to the official IRS EIN page: ${IRS_EIN_URL}`,
+      "- The product should not charge users to obtain an EIN from the IRS; any paid value should be document workflow, reminders, or administration support.",
+      "- After the EIN step, add an estate bank-account checklist and optional bank sponsorship/advertising lane with clear advertising disclosures.",
       "",
       "GitHub/deployment",
       "- Upload the static app, templates, documentation, and server helper together.",
@@ -7004,10 +7527,16 @@ function betaKnownLimitationsText(data = state) {
     "Legal logic",
     "- Edge cases involving formal probate, disputes, minors/protected persons, missing heirs, unknown addresses, military service, trusts, charities, public benefits, or unusual assets should be attorney-reviewed.",
     "- The attorney referral/handoff model is intentionally neutral and not monetized in this prototype.",
+    "- The app may keep collecting useful facts even when attorney review may later be recommended, so the user can leave with a usable case summary.",
+    "- Any attorney directory, sponsorship, subscription, or lead/referral model needs Wisconsin ethics and advertising review before it is monetized.",
     "",
     "Security",
     "- Save/resume is local browser prototype storage only.",
     "- Production needs secure hosted accounts, encrypted storage, access logs, retention/deletion policy, and secure document delivery links.",
+    "",
+    "Post-letters administration",
+    "- Future administration flow should link users to the official IRS EIN page after letters issue and before the estate bank-account step.",
+    "- Future bank-account advertising or sponsorship must be clearly disclosed and should not be presented as legal or financial advice.",
     "",
     "Payment",
     "- The beta unlock is $0 and models the future payment gate.",
@@ -7744,7 +8273,12 @@ function legalReviewChecklistItems() {
     {
       key: "attorney_handoff_ethics",
       label: "Attorney handoff/referrals",
-      detail: "Review neutral directory, sponsorship, subscription, lead-fee, and consent-based export options before monetizing referrals."
+      detail: "Review neutral directory, sponsorship, subscription, lead-fee, consent-based export, and user-data sharing rules before monetizing referrals."
+    },
+    {
+      key: "ein_bank_sponsorship",
+      label: "EIN and estate banking",
+      detail: "Confirm the post-letters EIN step, IRS link language, bank-account checklist, sponsorship disclosures, and advertising boundaries before adding paid bank placements."
     },
     {
       key: "privacy_security",
@@ -8755,13 +9289,8 @@ function renderOpeningDocsHandoff() {
     ${readinessIssueListHtml("Court or county will usually supply", readiness.courtSupplied, "warn", "courtSupplied")}
     ${readinessIssueListHtml("Review notes", readiness.reviewWarnings, "warn", "reviewWarnings")}
     ${readiness.ready ? `
-      <div class="handoff-card ready compact-handoff-card">
-        <p class="eyebrow">Next</p>
-        <h3>Go to final review before download.</h3>
-        <p>Confirm the packet summary and user agreement before the app unlocks the opening packet ZIP.</p>
-        <div class="handoff-actions single-action">
-          <button type="button" class="primary" data-continue-final-review>Continue to final review</button>
-        </div>
+      <div class="guided-note ready">
+        <p>The opening packet checkpoint is clear. Click Next to continue to final review before download.</p>
       </div>
     ` : `
       <div class="guided-note warn">
@@ -8769,7 +9298,6 @@ function renderOpeningDocsHandoff() {
       </div>
     `}
   `;
-  wrapper.querySelector("[data-continue-final-review]")?.addEventListener("click", () => goToInterviewStep("final-review-download"));
   bindReadinessIssueButtons(wrapper, readiness);
   bindIssueJumpButtons(wrapper);
   return wrapper;
@@ -8810,28 +9338,30 @@ function finalReviewSignatureSummaryHtml(data = state) {
   const summary = signatureTrackingSummary(data);
   const partyRows = summary.rows.filter((row) => row.required);
   const courtRows = summary.rows.filter((row) => !row.required);
+  const signerNames = uniqueScenarioNames(partyRows.map((row) => row.signer).filter((name) => hasValue(name) && name !== "(name needed)"));
   return `
     <section class="final-review-section">
       <div class="row-heading">
         <div>
           <p class="eyebrow">Signatures</p>
-          <h3>Who needs to sign</h3>
+          <h3>Sign after downloading</h3>
         </div>
         <span class="badge ${summary.pending ? "warn" : ""}">${partyRows.length} signer${partyRows.length === 1 ? "" : "s"}</span>
       </div>
-      <div class="final-review-list">
-        ${partyRows.length ? partyRows.map((row) => `
-          <div class="final-review-row">
-            <strong>${escapeHtml(row.signer)}</strong>
-            <span>${escapeHtml(row.formNumber)} ${escapeHtml(row.formName)}</span>
-            <p>${escapeHtml(row.detail)}</p>
-          </div>
-        `).join("") : `<p class="helper-text">No party signature requirements were detected from the active packet.</p>`}
-      </div>
-      ${courtRows.length ? `
+      <p class="helper-text">${partyRows.length
+        ? `After the forms are downloaded and printed, the packet instructions will identify which forms need wet signatures. Likely signer(s): ${escapeHtml(signerNames.join("; ") || "see packet instructions")}.`
+        : "No party signature requirements were detected from the active packet."}</p>
+      ${partyRows.length || courtRows.length ? `
         <details class="compact-help">
-          <summary>Court or registrar documents</summary>
+          <summary>View signature details</summary>
           <div class="final-review-list compact">
+            ${partyRows.map((row) => `
+              <div class="final-review-row">
+                <strong>${escapeHtml(row.signer)}</strong>
+                <span>${escapeHtml(row.formNumber)} ${escapeHtml(row.formName)}</span>
+                <p>${escapeHtml(row.detail)}</p>
+              </div>
+            `).join("")}
             ${courtRows.map((row) => `
               <div class="final-review-row muted">
                 <strong>${escapeHtml(row.formNumber)}</strong>
@@ -9120,6 +9650,17 @@ function suggestedInventoryDueDate() {
   return addMonthsIsoDate(state.deadlines.lettersIssuedDate, 6);
 }
 
+function postOpeningFutureAdminNoteHtml() {
+  return `
+    <details class="guided-note future-admin-note">
+      <summary>Future: EIN and estate bank account</summary>
+      <p>After domiciliary letters issue, a future version can guide the personal representative to the official IRS EIN page, then to an estate bank-account checklist.</p>
+      <p><a href="${escapeAttr(IRS_EIN_URL)}" target="_blank" rel="noopener">Open the official IRS EIN page</a></p>
+      <p>Any bank sponsorship or advertising should be clearly disclosed and kept separate from legal-information guidance.</p>
+    </details>
+  `;
+}
+
 function renderPostOpeningHandoff() {
   const lettersIssued = hasValue(state.deadlines.lettersIssuedDate);
   const suggestedInventoryDate = suggestedInventoryDueDate();
@@ -9175,6 +9716,7 @@ function renderPostOpeningHandoff() {
         </div>
       </div>
     </div>
+    ${postOpeningFutureAdminNoteHtml()}
     <div class="filing-room">
       <div class="row-heading">
         <div>
@@ -9293,7 +9835,7 @@ function renderOpeningPathInterview() {
           <label>Who cannot be found?
             <input data-guided-path="opening.peopleNotFound" value="${escapeAttr(state.opening.peopleNotFound)}" />
           </label>
-          <label>Publication newspaper
+          <label>Publication newspaper, if known
             <input data-guided-path="notice1805.newspaperName" value="${escapeAttr(state.notice1805.newspaperName)}" />
           </label>
         </div>
@@ -9587,7 +10129,7 @@ function guidedInventoryItemHtml(item, index) {
           <h3>Inventory item ${index + 1}</h3>
           <p>Use the lien field for mortgages, car loans, or other charges against this item.</p>
         </div>
-        <button type="button" class="ghost" data-remove-guided-inventory="${index}">Remove</button>
+        <button type="button" class="ghost danger-button" data-remove-guided-inventory="${index}">Remove item</button>
       </div>
       <div class="grid two compact">
         <label>Category
@@ -9690,6 +10232,9 @@ function renderHeirshipChildren() {
       const index = Number(input.dataset.heirshipChildIndex);
       state.heirship.children.people[index] = normalizeHeirshipChild(state.heirship.children.people[index]);
       state.heirship.children.people[index][input.dataset.heirshipChildField] = input.value;
+      if (input.dataset.heirshipChildField === "livingStatus") {
+        syncAddressForPartyLivingStatus(state.heirship.children.people[index]);
+      }
       syncHeirshipChildrenList();
       saveState();
       renderInterestedSuggestions();
@@ -9736,6 +10281,8 @@ function renderWillBeneficiaries() {
   if (!list) return;
   list.innerHTML = "";
   state.willBeneficiaries.forEach((person, index) => {
+    const normalized = normalizeWillBeneficiary(person);
+    state.willBeneficiaries[index] = normalized;
     const card = document.createElement("div");
     card.className = "person-card";
     card.innerHTML = `
@@ -9746,24 +10293,29 @@ function renderWillBeneficiaries() {
       ${partyPickerHtml("willBeneficiary", index)}
       <div class="grid two compact">
         <label>Name
-          <input data-beneficiary-field="name" data-beneficiary-index="${index}" value="${escapeAttr(person.name)}" />
+          <input data-beneficiary-field="name" data-beneficiary-index="${index}" value="${escapeAttr(normalized.name)}" />
         </label>
         <label>Role
           <select data-beneficiary-field="role" data-beneficiary-index="${index}">
-            ${beneficiaryRoleOptionsHtml(person.role)}
+            ${beneficiaryRoleOptionsHtml(normalized.role)}
           </select>
         </label>
         <label>Relationship or description
-          <input data-beneficiary-field="relationship" data-beneficiary-index="${index}" value="${escapeAttr(person.relationship)}" placeholder="Child, charity, friend, trust beneficiary" />
+          <input data-beneficiary-field="relationship" data-beneficiary-index="${index}" value="${escapeAttr(normalized.relationship)}" placeholder="Child, charity, friend, trust beneficiary" />
+        </label>
+        <label>Living status
+          <select data-beneficiary-field="livingStatus" data-beneficiary-index="${index}">
+            ${livingStatusOptionsHtml(normalized.livingStatus || "living", false)}
+          </select>
         </label>
         <label>Mailing address
-          <input data-beneficiary-field="address" data-beneficiary-index="${index}" value="${escapeAttr(person.address)}" />
+          <input data-beneficiary-field="address" data-beneficiary-index="${index}" value="${escapeAttr(displayAddressForParty(normalized))}" />
         </label>
-        <label>Minor date of birth
-          <input type="date" data-beneficiary-field="minorDateOfBirth" data-beneficiary-index="${index}" value="${escapeAttr(person.minorDateOfBirth)}" />
+        <label>Date of birth, if minor
+          <input type="date" data-beneficiary-field="minorDateOfBirth" data-beneficiary-index="${index}" value="${escapeAttr(normalized.minorDateOfBirth)}" />
         </label>
         <label>Notes
-          <input data-beneficiary-field="notes" data-beneficiary-index="${index}" value="${escapeAttr(person.notes)}" />
+          <input data-beneficiary-field="notes" data-beneficiary-index="${index}" value="${escapeAttr(normalized.notes)}" />
         </label>
       </div>
     `;
@@ -9778,20 +10330,20 @@ function renderWillBeneficiaries() {
   bindPartyPickers(list);
   list.querySelector("[data-add-beneficiary-bottom]")?.addEventListener("click", addWillBeneficiary);
   list.querySelectorAll("[data-beneficiary-field]").forEach((input) => {
-    input.addEventListener("input", () => {
+    const update = () => {
       const index = Number(input.dataset.beneficiaryIndex);
+      state.willBeneficiaries[index] = normalizeWillBeneficiary(state.willBeneficiaries[index]);
       state.willBeneficiaries[index][input.dataset.beneficiaryField] = input.value;
+      if (input.dataset.beneficiaryField === "livingStatus") {
+        syncAddressForPartyLivingStatus(state.willBeneficiaries[index]);
+      }
       saveState();
       renderInterestedSuggestions();
       renderReview();
-    });
-    input.addEventListener("change", () => {
-      const index = Number(input.dataset.beneficiaryIndex);
-      state.willBeneficiaries[index][input.dataset.beneficiaryField] = input.value;
-      saveState();
-      renderInterestedSuggestions();
-      renderReview();
-    });
+      if (input.dataset.beneficiaryField === "livingStatus") renderWillBeneficiaries();
+    };
+    input.addEventListener("input", update);
+    input.addEventListener("change", update);
   });
 
   list.querySelectorAll("[data-remove-beneficiary]").forEach((button) => {
@@ -9837,8 +10389,9 @@ function waiverStatusOptionsHtml(selected = "") {
   ].map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`).join("");
 }
 
-function locationStatusOptionsHtml(selected = "known") {
+function locationStatusOptionsHtml(selected = "") {
   return [
+    ["", "Select"],
     ["known", "Address/person known"],
     ["missing_address", "Address missing"],
     ["cannot_locate", "Cannot locate"],
@@ -10023,19 +10576,24 @@ function inferredInterestedService(person = {}, suggestion = {}, target = state)
   const normalized = normalizeInterestedPerson(person);
   const roles = inferredInterestedRoles(normalized, suggestion, target);
   const service = { ...emptyInterestedPerson().service, ...(suggestion.service || {}), ...(normalized.service || {}) };
-  const locationStatus = service.locationStatus || "known";
+  const locationStatus = service.locationStatus || "";
   const hasAddress = hasValue(normalized.address || suggestion.address);
+  const deceasedParty = partyMarkedDeceased(normalized) || partyMarkedDeceased(suggestion);
   const protectedPerson = Boolean(service.protectedPerson || roles.minor || roles.needsGuardian || hasValue(normalized.minorDateOfBirth) || hasValue(suggestion.minorDateOfBirth));
   const unknownOrMissing = ["cannot_locate", "unknown_person"].includes(locationStatus);
   const unableToWaive = ["cannot_sign", "will_not_sign", "not_eligible"].includes(service.waiverStatus);
 
-  if (!hasAddress && locationStatus === "known") service.locationStatus = "missing_address";
-  if (hasAddress && locationStatus === "missing_address") service.locationStatus = "known";
+  if (hasValue(locationStatus) && !hasAddress && locationStatus === "known") service.locationStatus = "missing_address";
+  if (hasValue(locationStatus) && hasAddress && locationStatus === "missing_address") service.locationStatus = "known";
   if (protectedPerson) {
     service.protectedPerson = true;
     if (!["cannot_sign", "will_not_sign", "not_eligible", "unknown"].includes(service.waiverStatus)) {
       service.waiverStatus = "not_eligible";
     }
+    service.needsMailedNotice = true;
+  }
+  if (deceasedParty) {
+    service.waiverStatus = service.waiverStatus || "not_eligible";
     service.needsMailedNotice = true;
   }
   if (unknownOrMissing) {
@@ -10052,13 +10610,14 @@ function applyInterestedPersonInferences(person = {}, suggestion = {}, target = 
   const normalized = normalizeInterestedPerson(person);
   if (!hasValue(normalized.name) && hasValue(suggestion.name)) normalized.name = cleanSuggestedPersonName(suggestion.name);
   normalized.relationship = relationshipText([normalized.relationship, suggestion.relationship]) || "Interested person";
+  if (!hasValue(normalized.livingStatus) && hasValue(suggestion.livingStatus)) normalized.livingStatus = cleanText(suggestion.livingStatus);
   if (!hasValue(normalized.address) && hasValue(suggestion.address)) normalized.address = cleanText(suggestion.address);
   if (!hasValue(normalized.minorDateOfBirth) && hasValue(suggestion.minorDateOfBirth)) {
     normalized.minorDateOfBirth = cleanText(suggestion.minorDateOfBirth);
   }
   normalized.roles = inferredInterestedRoles(normalized, suggestion, target);
   normalized.service = inferredInterestedService(normalized, suggestion, target);
-  return normalized;
+  return applyDeceasedPartyAddressDefault(normalized);
 }
 
 function defaultServiceForSuggestedInterestedPerson(person = {}, target = state) {
@@ -10066,8 +10625,12 @@ function defaultServiceForSuggestedInterestedPerson(person = {}, target = state)
   const service = { ...(normalized.service || {}) };
   const hasAddress = hasValue(normalized.address);
   const protectedPerson = Boolean(service.protectedPerson || normalized.roles?.minor || normalized.roles?.needsGuardian || hasValue(normalized.minorDateOfBirth));
-  const locationStatus = service.locationStatus || (hasAddress ? "known" : "missing_address");
-  service.locationStatus = locationStatus;
+  if (partyMarkedDeceased(normalized)) {
+    service.waiverStatus = service.waiverStatus || "not_eligible";
+    service.needsMailedNotice = true;
+    return service;
+  }
+  const locationStatus = service.locationStatus || "";
   if (protectedPerson) {
     service.protectedPerson = true;
     service.needsMailedNotice = true;
@@ -10079,7 +10642,7 @@ function defaultServiceForSuggestedInterestedPerson(person = {}, target = state)
     service.waiverStatus = service.waiverStatus || "unknown";
     return service;
   }
-  if (target.opening?.waiverStatus === "all_signed" && hasAddress && !hasValue(service.waiverStatus)) {
+  if (target.opening?.waiverStatus === "all_signed" && hasAddress && service.locationStatus === "known" && !hasValue(service.waiverStatus)) {
     service.waiverStatus = "can_sign";
   }
   return service;
@@ -10090,6 +10653,7 @@ function enrichInterestedSuggestion(suggestion = {}) {
     name: cleanSuggestedPersonName(suggestion.name),
     relationship: cleanText(suggestion.relationship),
     address: cleanText(suggestion.address),
+    livingStatus: cleanText(suggestion.livingStatus),
     minorDateOfBirth: cleanText(suggestion.minorDateOfBirth),
     source: cleanText(suggestion.source),
     roles: mergeInterestedRoles(suggestion.roles, rolesFromSuggestionRelationship(relationshipText([suggestion.relationship, suggestion.source])))
@@ -10104,14 +10668,31 @@ function enrichInterestedSuggestion(suggestion = {}) {
 
 function interestedPersonFromSuggestion(suggestion = {}) {
   const enriched = enrichInterestedSuggestion(suggestion);
-  return applyInterestedPersonInferences({
+  const person = applyInterestedPersonInferences({
     name: enriched.name,
     relationship: enriched.relationship || "Interested person",
     address: enriched.address || "",
+    livingStatus: enriched.livingStatus || "",
     minorDateOfBirth: enriched.minorDateOfBirth || "",
     roles: enriched.roles,
     service: enriched.service
   }, enriched);
+  if (hasValue(person.address) && !hasValue(person.service?.locationStatus)) {
+    person.service.locationStatus = "known";
+  }
+  if (
+    state.opening?.waiverStatus === "all_signed"
+    && person.service.locationStatus === "known"
+    && !hasValue(person.service.waiverStatus)
+    && !person.service.protectedPerson
+    && !person.roles?.minor
+    && !person.roles?.needsGuardian
+    && !partyMarkedDeceased(person)
+  ) {
+    person.service.waiverStatus = "can_sign";
+    person.service.needsMailedNotice = false;
+  }
+  return person;
 }
 
 function blankInterestedPerson(person = {}) {
@@ -10124,6 +10705,7 @@ function blankInterestedPerson(person = {}) {
     && !hasValue(normalized.minorDateOfBirth)
     && !hasValue(normalized.email)
     && !hasValue(normalized.phone)
+    && normalized.livingStatus !== "deceased"
     && !Object.values(normalized.roles || {}).some(Boolean);
 }
 
@@ -10207,10 +10789,15 @@ function renderInterestedPersons() {
         <label>Relationship
           <input data-person-field="relationship" data-person-index="${index}" value="${escapeAttr(normalized.relationship)}" placeholder="Heir, beneficiary, fiduciary" />
         </label>
-        <label>Mailing address
-          <input data-person-field="address" data-person-index="${index}" value="${escapeAttr(normalized.address)}" />
+        <label>Living status
+          <select data-person-field="livingStatus" data-person-index="${index}">
+            ${livingStatusOptionsHtml(normalized.livingStatus)}
+          </select>
         </label>
-        <label>Minor date of birth
+        <label>Mailing address
+          <input data-person-field="address" data-person-index="${index}" value="${escapeAttr(displayAddressForParty(normalized))}" />
+        </label>
+        <label>Date of birth, if minor
           <input type="date" data-person-field="minorDateOfBirth" data-person-index="${index}" value="${escapeAttr(normalized.minorDateOfBirth)}" />
         </label>
         <label>Email
@@ -10243,7 +10830,7 @@ function renderInterestedPersons() {
           </label>
           <label>Address/location status
             <select data-person-service-field="locationStatus" data-person-index="${index}">
-              ${locationStatusOptionsHtml(normalized.service?.locationStatus || "known")}
+              ${locationStatusOptionsHtml(normalized.service?.locationStatus || "")}
             </select>
           </label>
         </div>
@@ -10270,14 +10857,21 @@ function renderInterestedPersons() {
   bindPartyPickers(list);
   list.querySelector("[data-add-person-bottom]")?.addEventListener("click", addPerson);
   list.querySelectorAll("[data-person-field]").forEach((input) => {
-    input.addEventListener("input", () => {
+    const update = () => {
       const index = Number(input.dataset.personIndex);
       const key = input.dataset.personField;
+      state.interestedPersons[index] = normalizeInterestedPerson(state.interestedPersons[index]);
       state.interestedPersons[index][key] = input.value;
+      if (key === "livingStatus") {
+        syncAddressForPartyLivingStatus(state.interestedPersons[index]);
+      }
       saveState();
       renderReview();
+      if (key === "livingStatus") renderInterestedPersons();
       renderInterviewStatus();
-    });
+    };
+    input.addEventListener("input", update);
+    input.addEventListener("change", update);
   });
 
   list.querySelectorAll("[data-person-role]").forEach((input) => {
@@ -10366,11 +10960,13 @@ function interestedPersonSuggestions() {
 
     if (state.will.hasNamedBeneficiaries === "yes") {
       state.willBeneficiaries.forEach((beneficiary) => {
+        const normalized = normalizeWillBeneficiary(beneficiary);
         addInterestedSuggestion(suggestions, {
-          name: beneficiary.name,
-          relationship: relationshipText([beneficiaryRoleLabel(beneficiary.role), beneficiary.relationship]),
-          address: beneficiary.address,
-          minorDateOfBirth: beneficiary.minorDateOfBirth,
+          name: normalized.name,
+          relationship: relationshipText([beneficiaryRoleLabel(normalized.role), normalized.relationship, partyMarkedDeceased(normalized) ? "deceased beneficiary" : ""]),
+          address: displayAddressForParty(normalized),
+          livingStatus: normalized.livingStatus,
+          minorDateOfBirth: normalized.minorDateOfBirth,
           source: "Will beneficiaries"
         });
       });
@@ -10467,6 +11063,7 @@ function addInterestedSuggestion(suggestions, suggestion, options = {}) {
   if (existing) {
     existing.relationship = relationshipText([existing.relationship, enriched.relationship]);
     existing.address = existing.address || enriched.address || "";
+    existing.livingStatus = existing.livingStatus || enriched.livingStatus || "";
     existing.minorDateOfBirth = existing.minorDateOfBirth || enriched.minorDateOfBirth || "";
     existing.source = relationshipText([existing.source, enriched.source], " + ");
     existing.roles = mergeInterestedRoles(existing.roles, enriched.roles);
@@ -10669,7 +11266,7 @@ function renderInventoryItems() {
     card.innerHTML = `
       <div class="row-heading">
         <h3>Item ${index + 1}</h3>
-        <button type="button" class="ghost" data-remove-inventory="${index}">Remove</button>
+        <button type="button" class="ghost danger-button" data-remove-inventory="${index}">Remove item</button>
       </div>
       <div class="grid two compact">
         <label>Category
@@ -10767,6 +11364,7 @@ function copyApplicantToPreparer() {
   state.preparer.email = state.applicant.email;
   state.preparer.phone = state.applicant.phone;
   state.preparer.barNumber = state.applicant.barNumber;
+  state.ui.preparerSource = "applicant";
   saveState();
   renderFields();
   renderReview();
@@ -10779,6 +11377,7 @@ function copyPrToPreparer() {
   state.preparer.email = state.pr.email;
   state.preparer.phone = state.pr.phone;
   state.preparer.barNumber = state.pr.barNumber;
+  state.ui.preparerSource = "pr";
   saveState();
   renderFields();
   renderReview();
@@ -11229,7 +11828,7 @@ function validate() {
     if (blankInterestedPerson(normalizedPerson)) return;
     if (!hasValue(normalizedPerson.name)) blockers.push(`Interested person ${index + 1} needs a name.`);
     if (!hasValue(interestedRelationship(normalizedPerson))) blockers.push(`Interested person ${index + 1} needs a relationship or role.`);
-    if (!hasValue(normalizedPerson.address)) blockers.push(`Interested person ${index + 1} needs a mailing address.`);
+    if (!partyHasRequiredMailingAddress(normalizedPerson)) blockers.push(`Interested person ${index + 1} needs a mailing address.`);
     if (hasValue(normalizedPerson.minorDateOfBirth) || normalizedPerson.roles.minor) {
       warnings.push(`Interested person ${index + 1} appears to be a minor; waiver generation should be attorney-reviewed.`);
     }
@@ -11291,12 +11890,15 @@ function validate1806() {
 function validate1807() {
   const blockers = [];
   const warnings = [];
+  const prAddress = cleanText(state.pr.address) || (state.pr.sameAsApplicant ? cleanText(state.applicant.address) : "");
+  const prEmail = cleanText(state.pr.email) || (state.pr.sameAsApplicant ? cleanText(state.applicant.email) : "");
+  const prPhone = cleanText(state.pr.phone) || (state.pr.sameAsApplicant ? cleanText(state.applicant.phone) : "");
   if (!hasValue(state.estate.county)) blockers.push("PR-1807 needs the county.");
   if (!hasValue(state.decedent.fullName)) blockers.push("PR-1807 needs the decedent name.");
   if (!hasValue(state.pr.fullName)) blockers.push("PR-1807 needs the proposed personal representative name.");
-  if (!hasValue(state.pr.address)) warnings.push("PR-1807 should include the proposed PR address.");
-  if (!hasValue(state.pr.email)) warnings.push("PR-1807 should include the proposed PR email.");
-  if (!hasValue(state.pr.phone)) warnings.push("PR-1807 should include the proposed PR phone.");
+  if (!hasValue(prAddress)) warnings.push("PR-1807 should include the proposed PR address.");
+  if (!hasValue(prEmail)) warnings.push("PR-1807 should include the proposed PR email.");
+  if (!hasValue(prPhone)) warnings.push("PR-1807 should include the proposed PR phone.");
   if (!hasValue(state.pr.isWisconsinResident)) blockers.push("PR-1807 needs Wisconsin residency yes or no.");
   if (state.pr.isWisconsinResident === "no") {
     if (!hasValue(state.pr.residentAgent.name)) blockers.push("Nonresident PR requires a resident agent name.");
@@ -11420,12 +12022,13 @@ function validate1803(data = state) {
     const status = interestedPersonServiceStatus(person, data);
     const label = cleanText(person.name) || `signer ${index + 1}`;
     if (!hasValue(person.name)) blockers.push(`PR-1803 signer ${index + 1} needs a name.`);
-    if (!hasValue(person.address)) blockers.push(`PR-1803 ${label} needs a mailing address.`);
+    if (!partyHasRequiredMailingAddress(person)) blockers.push(`PR-1803 ${label} needs a mailing address.`);
     if (hasValue(person.minorDateOfBirth) || status.protectedPerson) blockers.push(`PR-1803 ${label} appears to be a minor or protected person; use attorney review before generating a waiver.`);
     if (status.unableToWaive) blockers.push(`PR-1803 ${label} is marked as unable, unwilling, not eligible, or protected; use the notice path or attorney review.`);
     if (status.unknownOrMissing) blockers.push(`PR-1803 ${label} is marked unknown or cannot be located; use the notice path or attorney review.`);
     if (person.service?.needsMailedNotice) warnings.push(`PR-1803 ${label} is marked as needing mailed notice; confirm a waiver-only opening is still appropriate.`);
     if (!hasValue(person.service?.waiverStatus)) blockers.push(`PR-1803 ${label} needs a waiver-status answer.`);
+    if (!hasValue(person.service?.locationStatus)) blockers.push(`PR-1803 ${label} needs an address/location-status answer.`);
     if (hasValue(person.service?.waiverStatus) && person.service?.waiverStatus !== "can_sign") {
       blockers.push(`PR-1803 ${label} is not marked as willing and eligible to sign a waiver.`);
     }
@@ -11482,7 +12085,7 @@ function validate1817(data = state) {
     const status = interestedPersonServiceStatus(person, data);
     const label = cleanText(person.name) || `recipient ${index + 1}`;
     if (!hasValue(person.name)) blockers.push(`PR-1817 recipient ${index + 1} needs a name.`);
-    if (!hasValue(person.address)) blockers.push(`PR-1817 ${label} needs a mailing address.`);
+    if (!partyHasRequiredMailingAddress(person)) blockers.push(`PR-1817 ${label} needs a mailing address.`);
     if (status.unknownOrMissing) warnings.push(`PR-1817 ${label} is marked unknown or cannot be located; confirm whether publication or another notice method is required.`);
     if (status.protectedPerson) warnings.push(`PR-1817 ${label} may need guardian/agent service review.`);
     if (status.person.roles?.military) warnings.push(`PR-1817 ${label} has a military-service flag; review service protections before defaulting.`);
@@ -11565,6 +12168,7 @@ function scenarioPerson(name, relationship, address, options = {}) {
     name,
     relationship,
     address,
+    livingStatus: options.livingStatus || "",
     minorDateOfBirth: options.minorDateOfBirth || "",
     email: options.email || "",
     phone: options.phone || "",
@@ -15419,9 +16023,11 @@ function evaluateTestScenario(scenario) {
     const reviews = scenarioFormReviews();
     const readiness = openingDocumentReadiness();
     const serviceSummary = interestedPersonServiceSummary(data);
+    const actualSuggestedNames = uniqueScenarioNames(interestedPersonSuggestions().map((suggestion) => suggestion.name));
+    const actualRosterNames = uniqueScenarioNames(masterPeopleRoster().map((person) => person.name));
     const actualInterestedNames = uniqueScenarioNames([
       ...activeInterestedPersonsForNotice(data).map((person) => person.name),
-      ...interestedPersonSuggestions().map((suggestion) => suggestion.name)
+      ...actualSuggestedNames
     ]);
     const checks = scenarioChecks(scenario.expected || {}, {
       decision,
@@ -15430,6 +16036,8 @@ function evaluateTestScenario(scenario) {
       reviews,
       readiness,
       serviceSummary,
+      actualSuggestedNames,
+      actualRosterNames,
       actualInterestedNames
     });
     if (/^batch2-/.test(scenario.id)) {
@@ -15440,6 +16048,8 @@ function evaluateTestScenario(scenario) {
         reviews,
         readiness,
         serviceSummary,
+        actualSuggestedNames,
+        actualRosterNames,
         actualInterestedNames
       }, scenario.expected || {}));
     }
@@ -15453,6 +16063,8 @@ function evaluateTestScenario(scenario) {
       reviews,
       readiness,
       serviceSummary,
+      actualSuggestedNames,
+      actualRosterNames,
       actualInterestedNames,
       checks,
       pass: checks.every((check) => check.pass)
@@ -15750,6 +16362,12 @@ function scenarioChecks(expected, actual) {
     const target = normalizedPersonName(name);
     const found = actual.actualInterestedNames.some((actualName) => normalizedPersonName(actualName) === target);
     addCheck(`Interested person carried forward: ${name}`, found, name, actual.actualInterestedNames.join(", "));
+  });
+
+  (actual.actualSuggestedNames || []).forEach((name) => {
+    const target = normalizedPersonName(name);
+    const found = (actual.actualRosterNames || []).some((actualName) => normalizedPersonName(actualName) === target);
+    addCheck(`Suggested person appears on people roster: ${name}`, found, name, (actual.actualRosterNames || []).join(", "));
   });
 
   (expected.excludedInterestedPersons || []).forEach((name) => {
@@ -19709,10 +20327,14 @@ function setDownloadArea(message, tone = "") {
 
 function betaDownloadFollowupHtml(productKey = documentProductKey()) {
   if (!CONTROLLED_BETA_MODE) return "";
+  const informalNextStep = productKey === "informal_probate" ? `
+      <button type="button" class="secondary" data-open-post-download-tasks>Go to filing and deadline tracker</button>
+  ` : "";
   return `
     <div class="download-followup">
       <strong>Beta follow-up</strong>
-      <p>After reviewing the packet, please leave feedback about packet decisions, interested persons, form output, or signing/eFiling instructions.</p>
+      <p>After downloading, use the filing and deadline tracker to follow what to file, sign, publish, wait for, and enter after letters issue. Please also leave feedback about packet decisions, interested persons, form output, or signing/eFiling instructions.</p>
+      ${informalNextStep}
       <button type="button" class="secondary" data-open-beta-feedback="${escapeAttr(productKey)}">Leave beta feedback</button>
     </div>
   `;
@@ -19731,6 +20353,9 @@ function openBetaFeedbackPanel(productKey = documentProductKey()) {
 }
 
 function bindDownloadFollowupActions() {
+  document.querySelectorAll("[data-open-post-download-tasks]").forEach((button) => {
+    button.addEventListener("click", () => goToInterviewStep("post-opening-handoff"));
+  });
   document.querySelectorAll("[data-open-beta-feedback]").forEach((button) => {
     button.addEventListener("click", () => openBetaFeedbackPanel(button.dataset.openBetaFeedback || documentProductKey()));
   });

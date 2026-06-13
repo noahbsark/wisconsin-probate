@@ -40,7 +40,7 @@ What it does:
 - Clears hardcoded preparer data unless the user supplies preparer information.
 - Adds an interested-person attachment when more than one interested person is entered.
 - Includes smarter interested-person roster syncing for heirs, will beneficiaries, trust beneficiaries, trustees, charity beneficiaries, minors/protected persons, and missing-address service review.
-- Includes 18 formal test scenarios covering waiver, PR-1805 notice, no-will guardrails, blended family, deceased-child descendants, minor/protected persons, trust beneficiaries, charity beneficiaries, missing addresses, nonresident PR issues, and auto-synced party treatment.
+- Includes 40 formal test scenarios covering waiver, PR-1805 notice, no-will guardrails, blended family, deceased-child descendants, minor/protected persons, trust beneficiaries, charity beneficiaries, missing addresses, nonresident PR issues, Transfer by Affidavit routing, and auto-synced party treatment.
 
 Opening-path logic:
 
@@ -81,7 +81,7 @@ Verification completed:
 - Generated PR-1804 passed structural Word XML validation.
 - Generated PR-1805 passed structural Word XML validation.
 - The no-will/no-waiver scenario blocks PR-1805 generation.
-- Formal scenario runner passed 26 probate fact patterns with 313 checks, including Transfer by Affidavit cases for under/over $50,000, pending probate, real estate notice, named-PR real estate limitation, public benefits/Estate Recovery, unknown successors, and vehicle transfer.
+- Formal scenario runner passed 40 probate fact patterns with 1109 checks, including the 12 attorney-reviewed Batch 2 scenarios and Transfer by Affidavit cases for under/over $50,000, pending probate, real estate notice, named-PR real estate limitation, public benefits/Estate Recovery, unknown successors, and vehicle transfer.
 - Generated PR-1806 passed structural Word XML validation.
 - Generated PR-1807 passed structural Word XML validation.
 - Generated PR-1807 nonresident sample populated the resident-agent branch.

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Wisconsin Probate Forms</title>
-    <link rel="stylesheet" href="styles.css?v=2026-06-12-quick-pick-selected-1" />
+    <link rel="stylesheet" href="styles.css?v=2026-06-12-suggestion-card-wrap-1" />
   </head>
   <body>
     <header class="topbar">
@@ -64,9 +64,9 @@
         </section>
         <section class="funnel-card">
           <span>Free result</span>
-          <h3>Information Summary</h3>
-          <strong>Attorney review may be recommended</strong>
-          <p>When answers show red flags, the software can organize an information summary that the user may download and choose whether to share with a Wisconsin probate attorney.</p>
+          <h3>Attorney-Ready Case Summary</h3>
+          <strong>Only shared by user choice</strong>
+          <p>If answers later show red flags, the software can organize the completed intake into a case summary that the user may choose to share with a Wisconsin probate attorney.</p>
         </section>
       </div>
 
@@ -180,6 +180,7 @@
             <li>User accounts and saved cases.</li>
             <li>Attorney, staff, PR, and public roles.</li>
             <li>Secure storage, audit history, and form versioning.</li>
+            <li>Consent-based attorney-ready case export before any referral monetization.</li>
           </ul>
         </article>
         <article class="roadmap-card">
@@ -200,6 +201,7 @@
             <li>PR-1811 asset wizard.</li>
             <li>Claims and deadline tracking.</li>
             <li>Estate account reconciliation.</li>
+            <li>Post-letters EIN and estate bank-account checklist.</li>
           </ul>
         </article>
         <article class="roadmap-card">
@@ -225,6 +227,7 @@
           <li>Expand formal test scenarios for affidavit, blended-family, deceased-child, trust, charity, and missing-party cases.</li>
           <li>Design the production data model for users, cases, parties, forms, tasks, documents, and audit events.</li>
           <li>Prototype secure document delivery permissions before connecting real email.</li>
+          <li>Plan the post-letters EIN link and estate bank-account partner lane with clear sponsorship disclosures.</li>
         </ol>
       </div>
     </section>
@@ -301,7 +304,7 @@
               <label>Case number
                 <input data-path="estate.caseNumber" placeholder="Blank until assigned" />
               </label>
-              <label>Estimated probate property value
+              <label>Estimated gross probate property value
                 <input data-path="estate.estimatedGrossValue" inputmode="decimal" placeholder="75000" />
               </label>
               <label>Other estate proceedings
@@ -310,6 +313,7 @@
                   <option value="not_pending">Are not pending</option>
                   <option value="pending">Are pending</option>
                 </select>
+                <span class="field-hint">Another probate, estate, or related court proceeding already filed for this decedent.</span>
               </label>
               <label>Explanation, if any
                 <input data-path="otherProceedings.explanation" />
@@ -347,7 +351,7 @@
                 <label>Probate registrar, if known
                   <input data-path="countyDefaults.registrarName" />
                 </label>
-                <label>Publication newspaper
+                <label>Publication newspaper, if known
                   <input data-path="countyDefaults.newspaperName" />
                 </label>
                 <label>Accommodation phone, if known
@@ -375,8 +379,9 @@
               <label>Date of death
                 <input type="date" data-path="decedent.dateOfDeath" />
               </label>
-              <label>Domicile county
+              <label>County of legal residence at death
                 <input data-path="decedent.domicileCounty" placeholder="Milwaukee" />
+                <span class="field-hint">Usually the same as the filing county for a Wisconsin resident.</span>
               </label>
               <label>Domicile state
                 <input data-path="decedent.domicileState" placeholder="Wisconsin" />
@@ -510,6 +515,7 @@
                   <option value="yes">Yes</option>
                   <option value="no">No</option>
                 </select>
+                <span class="field-hint">A codicil is a later written change or addition to a will.</span>
               </label>
               <label data-show-when="hasCodicils">Codicil dates
                 <input data-path="will.codicilDates" placeholder="Separate multiple dates with commas" />
@@ -833,7 +839,7 @@
               <label>Unknown names/addresses, if any
                 <input data-path="notice1805.unknownInterestedPersons" />
               </label>
-              <label>Publication newspaper
+              <label>Publication newspaper, if known
                 <input data-path="notice1805.newspaperName" />
               </label>
               <label>Why notice may be needed
@@ -902,7 +908,7 @@
                 <label>Claim deadline
                   <input type="date" data-path="notice1804.claimDeadline" />
                 </label>
-                <label>Publication newspaper
+                <label>Publication newspaper, if known
                   <input data-path="notice1804.newspaperName" />
                 </label>
                 <label>Courthouse county/name
@@ -1193,6 +1199,9 @@
             </div>
           </section>
         </form>
+        <div class="edit-return-bar edit-return-bottom">
+          <button type="button" id="returnGuidedFromEditBottomBtn" class="secondary">Return to Guided Interview</button>
+        </div>
       </main>
 
       <aside class="review" aria-live="polite">
@@ -1240,6 +1249,6 @@
     <script src="template-data-pr1805.js"></script>
     <script src="template-data-pr1817.js"></script>
     <script src="platform-config.js"></script>
-    <script src="app.js?v=2026-06-12-quick-pick-selected-1"></script>
+    <script src="app.js?v=2026-06-12-suggestion-card-wrap-1"></script>
   </body>
 </html>
